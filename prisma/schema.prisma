@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContentStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  MAINTAINED
+}
+
+enum ContentType {
+  PROJECT
+  CASE_STUDY
+  EXPERIMENT
+  BLOG
+  DASHBOARD
+}
+
+enum Visibility {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DocumentKind {
+  RESUME
+  CV
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          String    @default("ADMIN")
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Project {
+  id                 String        @id @default(cuid())
+  slug               String        @unique
+  title              String
+  subtitle           String
+  summary            String
+  description        String
+  status             ContentStatus @default(ACTIVE)
+  visibility         Visibility    @default(PUBLISHED)
+  techStack          String[]
+  tags               String[]
+  githubUrl          String?
+  demoUrl            String?
+  imageUrl           String?
+  metrics            Json
+  businessImpact     String
+  architectureCanvas Json
+  featured           Boolean       @default(false)
+  startDate          DateTime?
+  endDate            DateTime?
+  publishedAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model CaseStudy {
+  id            String     @id @default(cuid())
+  slug          String     @unique
+  title         String
+  summary       String
+  problem       String
+  context       String
+  approach      String
+  businessValue String
+  tags          String[]
+  imageUrl      String?
+  visibility    Visibility @default(PUBLISHED)
+  publishedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Experiment {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  summary     String
+  hypothesis  String
+  method      String
+  findings    String
+  nextStep    String
+  status      ContentStatus @default(ACTIVE)
+  tags        String[]
+  metrics     Json
+  imageUrl    String?
+  visibility  Visibility    @default(PUBLISHED)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Blog {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  excerpt     String
+  content     String
+  tags        String[]
+  readTime    Int
+  seoTitle    String
+  seoSummary  String
+  imageUrl    String?
+  visibility  Visibility @default(PUBLISHED)
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Dashboard {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  summary     String
+  embedUrl    String?
+  imageUrl    String?
+  tags        String[]
+  visibility  Visibility @default(PUBLISHED)
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Skill {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  level     Int
+  weight    Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Certification {
+  id        String   @id @default(cuid())
+  title     String
+  issuer    String
+  issuedAt  DateTime?
+  url       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  title       String
+  period      String
+  description String
+  signal      String
+  sortOrder   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PortfolioDocument {
+  id           String       @id @default(cuid())
+  kind         DocumentKind @unique
+  title        String
+  description  String
+  fileUrl      String
+  versionLabel String?
+  visibility   Visibility   @default(PUBLISHED)
+  publishedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model SiteProfile {
+  id                  String   @id @default("main")
+  name                String
+  initials            String
+  role                String
+  profileImageUrl     String?
+  contactEmail        String?
+  contactPhone        String?
+  contactLocation     String?
+  heroEyebrow         String
+  heroTitle           String
+  heroSummary         String
+  primaryCtaLabel     String
+  secondaryCtaLabel   String
+  focusLabel          String
+  focusValue          String
+  styleLabel          String
+  styleValue          String
+  modelLabel          String
+  modelValue          String
+  explorerEyebrow     String
+  explorerTitle       String
+  explorerDescription String
+  timelineEyebrow     String
+  timelineTitle       String
+  timelineDescription String
+  adminEyebrow        String
+  adminTitle          String
+  adminDescription    String
+  seoTitle            String
+  seoDescription      String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model JobFitSettings {
+  id                           String   @id @default("main")
+  deterministicFallbackEnabled Boolean  @default(true)
+  fallbackTimeoutSeconds       Int      @default(45)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model ReadingEvent {
+  id          String      @id @default(cuid())
+  contentType ContentType
+  slug        String
+  depth       Int
+  referrer    String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+}
