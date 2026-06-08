@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { Download, ImageIcon, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { ProfileImageCropper } from "@/components/profile-image-cropper";
+import { resolvePortfolioMedia } from "@/lib/media";
 import type {
   CertificationSignal,
   PortfolioDocument,
@@ -67,6 +69,8 @@ const textFields: Record<EditableKind, string[]> = {
     "contactEmail",
     "contactPhone",
     "contactLocation",
+    "githubUrl",
+    "linkedinUrl",
     "heroEyebrow",
     "heroTitle",
     "heroSummary",
@@ -123,6 +127,15 @@ async function uploadDocument(file: File): Promise<string | null> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch("/api/document-upload", { method: "POST", body: form });
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { url?: string };
+  return payload.url ?? null;
+}
+
+async function uploadImage(file: File): Promise<string | null> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch("/api/media", { method: "POST", body: form });
   if (!response.ok) return null;
   const payload = (await response.json()) as { url?: string };
   return payload.url ?? null;
@@ -274,6 +287,28 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
 
   const currentSignature = signatureFor(kind, title, slug, tags, techStack, statusValue, fieldValues);
   const hasUnsavedChanges = currentSignature !== savedSignature;
+
+  async function publishProfileImage(profileImageUrl: string) {
+    const nextFields = { ...fieldValues, profileImageUrl };
+    setFieldValues(nextFields);
+    setSaving(true);
+    try {
+      const response = await fetch("/api/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "site-profile", ...nextFields })
+      });
+      const result = (await response.json()) as { error?: unknown };
+      if (!response.ok) {
+        const error = typeof result.error === "string" ? result.error : JSON.stringify(result.error ?? "Unknown error");
+        throw new Error(`Publish failed: ${error}`);
+      }
+      setSavedSignature(signatureFor("site-profile", title, slug, tags, techStack, statusValue, nextFields));
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -518,15 +553,84 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         </label>
       ) : null}
 
-      {textFields[kind].map((field) =>
-        longFields.has(field) ? (
-          <MarkdownEditor
-            key={field}
-            label={labelFor(field)}
-            value={fieldValues[field] ?? ""}
-            onChange={(v) => setFieldValues((current) => ({ ...current, [field]: v }))}
-            required={!["embedUrl", "imageUrl", "url", "issuedAt"].includes(field)}
-          />
+      <div className="grid gap-4 md:grid-cols-2">
+        {textFields[kind].map((field) =>
+          field === "profileImageUrl" ? (
+            <ProfileImageCropper
+              key={field}
+              value={fieldValues[field] ?? ""}
+              onChange={publishProfileImage}
+              onMessage={setMessage}
+            />
+          ) : field === "imageUrl" ? (
+          <div key={field} className="overflow-hidden rounded-md border hairline bg-[var(--panel-strong)] md:col-span-2">
+            <div className="grid gap-4 p-4 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-md border hairline bg-[var(--panel)]">
+                {fieldValues[field] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resolvePortfolioMedia(fieldValues[field])}
+                    alt={`${labelFor(field)} preview`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="grid h-full place-items-center text-[var(--muted)]">
+                    <ImageIcon aria-hidden className="h-6 w-6" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{labelFor(field)}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Upload an image or replace its source.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-ink-900 px-4 text-sm font-medium text-white transition hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950">
+                    <Upload aria-hidden className="h-4 w-4" />
+                    Upload image
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                      className="sr-only"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        setMessage("Uploading image...");
+                        const url = await uploadImage(file);
+                        setMessage(url ? "Image uploaded. Save to publish it." : "Image upload failed.");
+                        if (url) setFieldValues((current) => ({ ...current, [field]: url }));
+                      }}
+                    />
+                  </label>
+                  {fieldValues[field] ? (
+                    <button
+                      type="button"
+                      onClick={() => setFieldValues((current) => ({ ...current, [field]: "" }))}
+                      className="h-10 rounded-md border hairline px-4 text-sm font-medium transition hover:border-cobalt-500"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--muted)]">Use an image URL instead</summary>
+                  <input
+                    value={fieldValues[field] ?? ""}
+                    onChange={(event) => setFieldValues((current) => ({ ...current, [field]: event.target.value }))}
+                    placeholder="https://... or /uploads/..."
+                    className="mt-2 h-10 w-full rounded-md border hairline bg-[var(--panel)] px-3 text-sm outline-none focus:border-cobalt-500"
+                  />
+                </details>
+              </div>
+            </div>
+          </div>
+          ) : longFields.has(field) ? (
+          <div key={field} className="md:col-span-2">
+            <MarkdownEditor
+              label={labelFor(field)}
+              value={fieldValues[field] ?? ""}
+              onChange={(v) => setFieldValues((current) => ({ ...current, [field]: v }))}
+              required={!["embedUrl", "imageUrl", "url", "issuedAt"].includes(field)}
+            />
+          </div>
         ) : (
           <label key={field}>
             <span className="text-sm font-medium">{labelFor(field)}</span>
@@ -538,8 +642,9 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
               className="mt-2 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3 py-2 outline-none focus:border-cobalt-500"
             />
           </label>
-        )
-      )}
+          )
+        )}
+      </div>
 
       {kind === "project" ? (
         <label>

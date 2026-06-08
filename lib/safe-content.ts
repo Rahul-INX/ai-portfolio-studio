@@ -21,6 +21,8 @@ export const safeSiteProfile: SiteProfile = {
   contactEmail: "rahulharivanshfatyal@gmail.com",
   contactPhone: "+91 98050 70462",
   contactLocation: "Bilaspur, Himachal Pradesh, India",
+  githubUrl: null,
+  linkedinUrl: null,
   heroEyebrow: "GenAI Developer / Data Science Professional",
   heroTitle: "Building retrieval, automation, and data products that turn messy knowledge into decisions.",
   heroSummary:

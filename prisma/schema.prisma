@@ -225,6 +225,8 @@ model SiteProfile {
   contactEmail        String?
   contactPhone        String?
   contactLocation     String?
+  githubUrl           String?
+  linkedinUrl         String?
   heroEyebrow         String
   heroTitle           String
   heroSummary         String

@@ -399,6 +399,15 @@ a {
   to { transform: rotate(360deg); }
 }
 
+@keyframes navigation-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(210%); }
+}
+
+.navigation-progress {
+  animation: navigation-progress 1.1s ease-in-out infinite;
+}
+
 @keyframes job-fit-scan {
   0% {
     transform: translate3d(-45%, -12%, 0) rotate(-8deg);
@@ -532,7 +541,8 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .job-fit-generation-scan,
-  .job-fit-generation-progress {
+  .job-fit-generation-progress,
+  .navigation-progress {
     animation: none;
   }
   *,

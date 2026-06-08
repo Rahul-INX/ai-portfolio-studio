@@ -16,6 +16,26 @@ test.describe("portfolio platform", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("home keeps the portrait bounded and at a 4:5 ratio", async ({ page }) => {
+    await page.goto("/");
+    const portraits = page.getByAltText(/rahul harivansh fatyal portrait/i);
+    const portrait = portraits.last();
+    await expect(portrait).toBeVisible();
+
+    const imageBox = await portrait.boundingBox();
+    expect(imageBox).not.toBeNull();
+    expect(imageBox!.width / imageBox!.height).toBeCloseTo(4 / 5, 2);
+
+    if (page.viewportSize()!.width >= 1024) {
+      const cardBox = await portrait.locator("xpath=../..").boundingBox();
+      expect(cardBox).not.toBeNull();
+      expect(cardBox!.width).toBeLessThanOrEqual(450);
+      expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 16);
+    }
+
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("explorer supports search and taxonomy filtering", async ({ page }) => {
     await page.goto("/explorer");
     await page.getByLabel(/search portfolio content/i).fill("resume");

@@ -132,6 +132,8 @@ const siteProfileSchema = z.object({
   contactEmail: z.string().trim().email().optional().or(z.literal("")),
   contactPhone: z.string().trim().min(6).optional().or(z.literal("")),
   contactLocation: z.string().trim().min(2).optional().or(z.literal("")),
+  githubUrl: z.string().trim().url().optional().or(z.literal("")),
+  linkedinUrl: z.string().trim().url().optional().or(z.literal("")),
   heroEyebrow: z.string().min(3),
   heroTitle: z.string().min(10),
   heroSummary: z.string().min(20),
@@ -306,14 +308,25 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.kind === "site-profile") {
-    const { kind: _kind, profileImageUrl, contactEmail, contactPhone, contactLocation, ...data } = parsed.data;
+    const {
+      kind: _kind,
+      profileImageUrl,
+      contactEmail,
+      contactPhone,
+      contactLocation,
+      githubUrl,
+      linkedinUrl,
+      ...data
+    } = parsed.data;
     void _kind;
     const profileData = {
       ...data,
       profileImageUrl: profileImageUrl || null,
       contactEmail: contactEmail || null,
       contactPhone: contactPhone || null,
-      contactLocation: contactLocation || null
+      contactLocation: contactLocation || null,
+      githubUrl: githubUrl || null,
+      linkedinUrl: linkedinUrl || null
     };
     const profile = await prisma.siteProfile.upsert({
       where: { id: "main" },

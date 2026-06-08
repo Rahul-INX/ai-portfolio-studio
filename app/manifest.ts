@@ -11,9 +11,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#121713",
     icons: [
       {
-        src: "/media/ai-systems-hero.png",
-        sizes: "1672x941",
-        type: "image/png",
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
         purpose: "any"
       }
     ]

@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   },
   description:
     "A premium AI engineering portfolio and knowledge hub focused on RAG, MLOps, structured extraction, analytics, and trustworthy AI systems.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg"
+  },
   openGraph: {
     title: "Rahul Harivansh Fatyal | Senior AI Engineer",
     description:

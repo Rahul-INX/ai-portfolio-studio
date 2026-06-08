@@ -134,6 +134,8 @@ export type SiteProfile = {
   contactEmail?: string | null;
   contactPhone?: string | null;
   contactLocation?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
   heroEyebrow: string;
   heroTitle: string;
   heroSummary: string;
