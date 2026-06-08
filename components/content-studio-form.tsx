@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Download } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import type {
@@ -160,6 +161,7 @@ function labelFor(field: string) {
 }
 
 export function ContentStudioForm({ data }: { data: StudioData }) {
+  const router = useRouter();
   const [kind, setKind] = useState<EditableKind>("site-profile");
   const [selectedKey, setSelectedKey] = useState("main");
   const [title, setTitle] = useState("");
@@ -384,12 +386,22 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      const result = (await response.json()) as { error?: unknown; paths?: string[] };
       if (response.ok) {
         setSavedSignature(currentSignature);
-        setMessage("Saved. Refresh the page to see the latest database content.");
+        setMessage("Saved and published. Public pages now use the latest database content.");
+        router.refresh();
       } else {
-        setMessage("Save failed. Check database/auth configuration.");
+        const error =
+          typeof result.error === "string"
+            ? result.error
+            : result.error
+              ? JSON.stringify(result.error)
+              : "Check database and authentication configuration.";
+        setMessage(`Save failed: ${error}`);
       }
+    } catch {
+      setMessage("Save failed: the server could not be reached.");
     } finally {
       setSaving(false);
     }

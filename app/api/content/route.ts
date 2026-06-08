@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { affectedContentPaths, type EditableContentKind } from "@/lib/content-paths";
 import { getExplorerItems } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 
@@ -170,6 +172,14 @@ const contentSchema = z.discriminatedUnion("kind", [
   siteProfileSchema
 ]);
 
+function publishedResponse(item: unknown, kind: EditableContentKind, slug?: string) {
+  const paths = affectedContentPaths(kind, slug);
+  for (const path of paths) revalidatePath(path);
+  revalidatePath("/admin");
+  revalidatePath("/admin/new-project");
+  return NextResponse.json({ item, paths }, { status: 201 });
+}
+
 export async function GET() {
   return NextResponse.json({ items: await getExplorerItems() });
 }
@@ -205,7 +215,7 @@ export async function POST(request: Request) {
       update: published,
       create: published
     });
-    return NextResponse.json({ item: project }, { status: 201 });
+    return publishedResponse(project, "project", data.slug);
   }
 
   if (parsed.data.kind === "case-study") {
@@ -217,7 +227,7 @@ export async function POST(request: Request) {
       update: published,
       create: published
     });
-    return NextResponse.json({ item: caseStudy }, { status: 201 });
+    return publishedResponse(caseStudy, "case-study", data.slug);
   }
 
   if (parsed.data.kind === "experiment") {
@@ -229,7 +239,7 @@ export async function POST(request: Request) {
       update: published,
       create: published
     });
-    return NextResponse.json({ item: experiment }, { status: 201 });
+    return publishedResponse(experiment, "experiment", data.slug);
   }
 
   if (parsed.data.kind === "blog") {
@@ -241,14 +251,14 @@ export async function POST(request: Request) {
       update: published,
       create: published
     });
-    return NextResponse.json({ item: blog }, { status: 201 });
+    return publishedResponse(blog, "blog", data.slug);
   }
 
   if (parsed.data.kind === "skill") {
     const { kind: _kind, id, ...data } = parsed.data;
     void _kind;
     const skill = id ? await prisma.skill.update({ where: { id }, data }) : await prisma.skill.create({ data });
-    return NextResponse.json({ item: skill }, { status: 201 });
+    return publishedResponse(skill, "skill");
   }
 
   if (parsed.data.kind === "certification") {
@@ -262,14 +272,14 @@ export async function POST(request: Request) {
     const certification = id
       ? await prisma.certification.update({ where: { id }, data: certificationData })
       : await prisma.certification.create({ data: certificationData });
-    return NextResponse.json({ item: certification }, { status: 201 });
+    return publishedResponse(certification, "certification");
   }
 
   if (parsed.data.kind === "timeline") {
     const { kind: _kind, id, ...data } = parsed.data;
     void _kind;
     const event = id ? await prisma.timelineEvent.update({ where: { id }, data }) : await prisma.timelineEvent.create({ data });
-    return NextResponse.json({ item: event }, { status: 201 });
+    return publishedResponse(event, "timeline");
   }
 
   if (parsed.data.kind === "document") {
@@ -292,7 +302,7 @@ export async function POST(request: Request) {
         publishedAt: new Date()
       }
     });
-    return NextResponse.json({ item: document }, { status: 201 });
+    return publishedResponse(document, "document");
   }
 
   if (parsed.data.kind === "site-profile") {
@@ -310,7 +320,7 @@ export async function POST(request: Request) {
       update: profileData,
       create: { id: "main", ...profileData }
     });
-    return NextResponse.json({ item: profile }, { status: 201 });
+    return publishedResponse(profile, "site-profile");
   }
 
   const { kind: _kind, ...data } = parsed.data;
@@ -330,5 +340,5 @@ export async function POST(request: Request) {
     }
   });
 
-  return NextResponse.json({ item: dashboard }, { status: 201 });
+  return publishedResponse(dashboard, "dashboard", data.slug);
 }

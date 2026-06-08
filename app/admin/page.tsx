@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { Database, FileDown, FileText, FlaskConical, LayoutDashboard, PenTool, Workflow } from "lucide-react";
+import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { JobFitSettingsForm } from "@/components/job-fit-settings-form";
 import { SiteShell } from "@/components/site-shell";
 import { authOptions } from "@/lib/auth";
@@ -44,9 +45,12 @@ export default async function AdminPage() {
               {profile.adminDescription}
             </p>
           </div>
-          <Link href="/admin/new-project" className="rounded-md bg-ink-900 px-5 py-3 text-sm font-medium text-white dark:bg-ink-50 dark:text-ink-950">
-            Open studio
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <AdminLogoutButton />
+            <Link href="/admin/new-project" className="inline-flex h-11 items-center rounded-md bg-ink-900 px-5 text-sm font-medium text-white dark:bg-ink-50 dark:text-ink-950">
+              Open studio
+            </Link>
+          </div>
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           <div className="surface rounded-lg p-5">

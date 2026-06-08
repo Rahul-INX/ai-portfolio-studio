@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { ContentStudioForm } from "@/components/content-studio-form";
+import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { SiteShell } from "@/components/site-shell";
 import { authOptions } from "@/lib/auth";
 import {
@@ -39,8 +40,13 @@ export default async function NewProjectPage() {
   return (
     <SiteShell profile={profile}>
       <section className="mx-auto w-full max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12 2xl:px-10">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">CMS</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-normal">Editable content studio</h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">CMS</p>
+            <h1 className="mt-4 text-4xl font-semibold tracking-normal">Editable content studio</h1>
+          </div>
+          <AdminLogoutButton />
+        </div>
         <p className="mt-4 max-w-2xl leading-7 text-[var(--muted)]">
           Edit the public profile, projects, case studies, experiments, blogs, dashboards, skills, certifications, and timeline records without touching source files.
         </p>
