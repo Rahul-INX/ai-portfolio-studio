@@ -1,150 +1,63 @@
-import { existsSync } from "fs";
-import { readdir, rm } from "fs/promises";
-import path from "path";
 import { prisma } from "../lib/prisma";
-const uploadDir = path.join(process.cwd(), "public", "uploads");
 
-function isLocalUpload(value?: string | null) {
-  return Boolean(value?.startsWith("/uploads/"));
-}
+const FILE_URL_PATTERN = /\/api\/files\/([a-zA-Z0-9_-]+)/g;
 
-function uploadPath(value: string) {
-  return path.join(process.cwd(), "public", value.replace(/^\//, ""));
-}
-
-function markdownImages(value: string) {
-  return Array.from(value.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)).map((match) => match[1].trim());
-}
-
-function removeBrokenMarkdownImages(value: string, broken: Set<string>) {
-  if (!broken.size) return value;
-  return value
-    .split(/\r?\n/)
-    .filter((line) => !Array.from(broken).some((url) => line.includes(`](${url})`)))
-    .join("\n");
+function collectFileIds(value: unknown, referenced: Set<string>) {
+  if (typeof value !== "string") return;
+  for (const match of value.matchAll(FILE_URL_PATTERN)) {
+    referenced.add(match[1]);
+  }
 }
 
 async function cleanup() {
   const referenced = new Set<string>();
-  const broken = new Set<string>();
-
-  const [projects, caseStudies, experiments, blogs, dashboards] = await Promise.all([
+  const [
+    projects,
+    caseStudies,
+    experiments,
+    blogs,
+    dashboards,
+    documents,
+    profile,
+  ] = await Promise.all([
     prisma.project.findMany(),
     prisma.caseStudy.findMany(),
     prisma.experiment.findMany(),
     prisma.blog.findMany(),
-    prisma.dashboard.findMany()
+    prisma.dashboard.findMany(),
+    prisma.portfolioDocument.findMany(),
+    prisma.siteProfile.findUnique({ where: { id: "main" } }),
   ]);
 
-  const track = (url?: string | null) => {
-    if (!url) return;
-    referenced.add(url);
-    if (isLocalUpload(url) && !existsSync(uploadPath(url))) broken.add(url);
-  };
-
-  for (const item of projects) {
-    track(item.imageUrl);
-    for (const url of [...markdownImages(item.description), ...markdownImages(item.businessImpact)]) track(url);
-  }
-  for (const item of caseStudies) {
-    track(item.imageUrl);
-    for (const url of [
-      ...markdownImages(item.problem),
-      ...markdownImages(item.context),
-      ...markdownImages(item.approach),
-      ...markdownImages(item.businessValue)
-    ]) track(url);
-  }
-  for (const item of experiments) {
-    track(item.imageUrl);
-    for (const url of [
-      ...markdownImages(item.hypothesis),
-      ...markdownImages(item.method),
-      ...markdownImages(item.findings),
-      ...markdownImages(item.nextStep)
-    ]) track(url);
-  }
-  for (const item of blogs) {
-    track(item.imageUrl);
-    for (const url of markdownImages(item.content)) track(url);
-  }
-  for (const item of dashboards) track(item.imageUrl);
-
-  if (broken.size) {
-    await Promise.all([
-      ...projects.map((item) =>
-        prisma.project.update({
-          where: { id: item.id },
-          data: {
-            imageUrl: broken.has(item.imageUrl ?? "") ? null : item.imageUrl,
-            description: removeBrokenMarkdownImages(item.description, broken),
-            businessImpact: removeBrokenMarkdownImages(item.businessImpact, broken)
-          }
-        })
-      ),
-      ...caseStudies.map((item) =>
-        prisma.caseStudy.update({
-          where: { id: item.id },
-          data: {
-            imageUrl: broken.has(item.imageUrl ?? "") ? null : item.imageUrl,
-            problem: removeBrokenMarkdownImages(item.problem, broken),
-            context: removeBrokenMarkdownImages(item.context, broken),
-            approach: removeBrokenMarkdownImages(item.approach, broken),
-            businessValue: removeBrokenMarkdownImages(item.businessValue, broken)
-          }
-        })
-      ),
-      ...experiments.map((item) =>
-        prisma.experiment.update({
-          where: { id: item.id },
-          data: {
-            imageUrl: broken.has(item.imageUrl ?? "") ? null : item.imageUrl,
-            hypothesis: removeBrokenMarkdownImages(item.hypothesis, broken),
-            method: removeBrokenMarkdownImages(item.method, broken),
-            findings: removeBrokenMarkdownImages(item.findings, broken),
-            nextStep: removeBrokenMarkdownImages(item.nextStep, broken)
-          }
-        })
-      ),
-      ...blogs.map((item) =>
-        prisma.blog.update({
-          where: { id: item.id },
-          data: {
-            imageUrl: broken.has(item.imageUrl ?? "") ? null : item.imageUrl,
-            content: removeBrokenMarkdownImages(item.content, broken)
-          }
-        })
-      ),
-      ...dashboards.map((item) =>
-        broken.has(item.imageUrl ?? "")
-          ? prisma.dashboard.update({ where: { id: item.id }, data: { imageUrl: null } })
-          : Promise.resolve(item)
-      )
-    ]);
+  for (const record of [
+    ...projects,
+    ...caseStudies,
+    ...experiments,
+    ...blogs,
+    ...dashboards,
+    ...documents,
+    ...(profile ? [profile] : []),
+  ]) {
+    for (const value of Object.values(record)) collectFileIds(value, referenced);
   }
 
-  let deletedFiles = 0;
-  if (existsSync(uploadDir)) {
-    const files = await readdir(uploadDir);
-    for (const file of files) {
-      const url = `/uploads/${file}`;
-      if (!referenced.has(url)) {
-        await rm(path.join(uploadDir, file), { force: true });
-        deletedFiles += 1;
-      }
-    }
-  }
+  const storedFiles = await prisma.storedFile.findMany({ select: { id: true } });
+  const unusedIds = storedFiles
+    .map((file) => file.id)
+    .filter((id) => !referenced.has(id));
+  const deleted = unusedIds.length
+    ? await prisma.storedFile.deleteMany({ where: { id: { in: unusedIds } } })
+    : { count: 0 };
 
   console.log(
     JSON.stringify(
       {
-        referencedImages: referenced.size,
-        brokenDatabaseReferencesRemoved: broken.size,
-        unusedUploadFilesDeleted: deletedFiles
+        referencedDatabaseFiles: referenced.size,
+        unusedDatabaseFilesDeleted: deleted.count,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 

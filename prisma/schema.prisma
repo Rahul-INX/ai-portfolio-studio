@@ -270,3 +270,14 @@ model ReadingEvent {
   userAgent   String?
   createdAt   DateTime    @default(now())
 }
+
+model StoredFile {
+  id          String   @id @default(cuid())
+  fileName    String
+  contentType String
+  size        Int
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

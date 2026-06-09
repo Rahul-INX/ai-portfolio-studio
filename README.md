@@ -10,7 +10,7 @@ Reusable personal portfolio and evidence hub with JD-derived recruiter matching 
 - Prisma + PostgreSQL for dynamic content models
 - NextAuth credentials provider for the admin CMS
 - Vercel-ready deployment shape
-- Cloudinary-compatible remote image configuration plus local portfolio-safe media
+- PostgreSQL-backed image and document uploads through `DATABASE_URL`
 
 ## Local Setup
 
@@ -28,7 +28,7 @@ npm.cmd run prisma:push
 npm.cmd run prisma:seed
 ```
 
-Set `CLOUDINARY_CLOUD_NAME` when dashboard/gallery image records should use Cloudinary public IDs. Production media uploads also require either `CLOUDINARY_UPLOAD_PRESET` (an unsigned preset) or both `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`. Fully-qualified `https://...` and local `/media/...` URLs are also accepted. Uploaded images must be 4 MB or smaller to remain below Vercel's request-body limit.
+Uploaded images and documents are stored in PostgreSQL through `DATABASE_URL` and served from `/api/files/[id]`. No external media-storage credentials are required. Uploads must be 4 MB or smaller to remain below Vercel's request-body limit.
 
 ## Content Safety
 

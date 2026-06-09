@@ -47,7 +47,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
               <BarChart3 aria-hidden className="mx-auto h-10 w-10 text-cobalt-500" />
               <h2 className="mt-5 text-xl font-semibold">Interactive embed ready</h2>
               <p className="mt-3 leading-7 text-[var(--muted)]">
-                This slot is configured for Power BI screenshots, Streamlit apps, or Cloudinary-hosted analytics media.
+                This slot is configured for Power BI screenshots, Streamlit apps, or database-hosted analytics media.
               </p>
             </div>
           )}

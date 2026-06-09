@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
+import { readApiResponse } from "@/lib/api-response";
 import { resolvePortfolioMedia } from "@/lib/media";
 import type {
   CertificationSignal,
@@ -131,8 +132,7 @@ async function uploadDocument(file: File): Promise<string | null> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch("/api/document-upload", { method: "POST", body: form });
-  if (!response.ok) return null;
-  const payload = (await response.json()) as { url?: string };
+  const payload = await readApiResponse<{ url?: string }>(response);
   return payload.url ?? null;
 }
 
@@ -140,8 +140,7 @@ async function uploadImage(file: File): Promise<string | null> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch("/api/media", { method: "POST", body: form });
-  if (!response.ok) return null;
-  const payload = (await response.json()) as { url?: string };
+  const payload = await readApiResponse<{ url?: string }>(response);
   return payload.url ?? null;
 }
 
@@ -400,11 +399,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "site-profile", ...nextFields })
       });
-      const result = (await response.json()) as { error?: unknown };
-      if (!response.ok) {
-        const error = typeof result.error === "string" ? result.error : JSON.stringify(result.error ?? "Unknown error");
-        throw new Error(`Publish failed: ${error}`);
-      }
+      await readApiResponse(response);
       setSavedSignature(signatureFor("site-profile", title, slug, tags, techStack, statusValue, nextFields));
       router.refresh();
     } finally {
@@ -526,22 +521,14 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const result = (await response.json()) as { error?: unknown; paths?: string[] };
-      if (response.ok) {
-        setSavedSignature(currentSignature);
-        setMessage("Saved and published. Public pages now use the latest database content.");
-        router.refresh();
-      } else {
-        const error =
-          typeof result.error === "string"
-            ? result.error
-            : result.error
-              ? JSON.stringify(result.error)
-              : "Check database and authentication configuration.";
-        setMessage(`Save failed: ${error}`);
-      }
-    } catch {
-      setMessage("Save failed: the server could not be reached.");
+      await readApiResponse(response);
+      setSavedSignature(currentSignature);
+      setMessage("Saved and published. Public pages now use the latest database content.");
+      router.refresh();
+    } catch (error) {
+      setMessage(
+        `Save failed: ${error instanceof Error ? error.message : "The server could not be reached."}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -620,9 +607,13 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                 const file = event.target.files?.[0];
                 if (!file) return;
                 setMessage("Uploading document...");
-                const url = await uploadDocument(file);
-                setMessage(url ? "Document uploaded. Save editable content to publish it." : "Document upload failed.");
-                if (url) setFieldValues((current) => ({ ...current, fileUrl: url }));
+                try {
+                  const url = await uploadDocument(file);
+                  setMessage(url ? "Document uploaded. Save editable content to publish it." : "Document upload failed.");
+                  if (url) setFieldValues((current) => ({ ...current, fileUrl: url }));
+                } catch (error) {
+                  setMessage(error instanceof Error ? error.message : "Document upload failed.");
+                }
               }}
               className="mt-2 block w-full rounded-md border hairline bg-[var(--panel-strong)] px-3 py-2 text-sm"
             />
@@ -755,15 +746,19 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                     Upload image
                     <input
                       type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
                       className="sr-only"
                       onChange={async (event) => {
                         const file = event.target.files?.[0];
                         if (!file) return;
                         setMessage("Uploading image...");
-                        const url = await uploadImage(file);
-                        setMessage(url ? "Image uploaded. Save to publish it." : "Image upload failed.");
-                        if (url) setFieldValues((current) => ({ ...current, [field]: url }));
+                        try {
+                          const url = await uploadImage(file);
+                          setMessage(url ? "Image uploaded. Save to publish it." : "Image upload failed.");
+                          if (url) setFieldValues((current) => ({ ...current, [field]: url }));
+                        } catch (error) {
+                          setMessage(error instanceof Error ? error.message : "Image upload failed.");
+                        }
                       }}
                     />
                   </label>
@@ -782,7 +777,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                   <input
                     value={fieldValues[field] ?? ""}
                     onChange={(event) => setFieldValues((current) => ({ ...current, [field]: event.target.value }))}
-                    placeholder="https://... or /uploads/..."
+                    placeholder="https://... or /api/files/..."
                     className="mt-2 h-10 w-full rounded-md border hairline bg-[var(--panel)] px-3 text-sm outline-none focus:border-cobalt-500"
                   />
                 </details>

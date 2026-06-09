@@ -7,6 +7,8 @@ import { affectedContentPaths, type EditableContentKind } from "@/lib/content-pa
 import { getExplorerItems } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
 const baseSchema = z.object({
   kind: z.enum(["project", "case-study", "experiment", "blog", "dashboard", "skill", "certification", "timeline", "document"]),
   title: z.string().min(3),
@@ -18,7 +20,7 @@ const optionalImageSchema = z
   .string()
   .trim()
   .refine((value) => !value || value.startsWith("/") || /^https?:\/\//.test(value), {
-    message: "Use a hosted image URL or an uploaded /uploads path."
+    message: "Use a hosted image URL or an uploaded /api/files path."
   })
   .optional()
   .or(z.literal(""));
@@ -121,7 +123,7 @@ const documentSchema = z.object({
     .string()
     .trim()
     .refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), {
-      message: "Use an uploaded /documents path or a hosted document URL."
+      message: "Use an uploaded /api/files path or a hosted document URL."
     }),
   versionLabel: z.string().optional().or(z.literal(""))
 });
@@ -179,17 +181,32 @@ const contentSchema = z.discriminatedUnion("kind", [
 
 function publishedResponse(item: unknown, kind: EditableContentKind, slug?: string) {
   const paths = affectedContentPaths(kind, slug);
-  for (const path of paths) revalidatePath(path);
-  revalidatePath("/admin");
-  revalidatePath("/admin/new-project");
-  return NextResponse.json({ item, paths }, { status: 201 });
+  const revalidationErrors: string[] = [];
+  for (const path of [...paths, "/admin", "/admin/new-project"]) {
+    try {
+      revalidatePath(path);
+    } catch (error) {
+      revalidationErrors.push(path);
+      console.error(`[content] Failed to revalidate ${path}`, error);
+    }
+  }
+  return NextResponse.json(
+    {
+      item,
+      paths,
+      ...(revalidationErrors.length
+        ? { warning: "Content was published, but some pages may refresh after their normal cache interval." }
+        : {}),
+    },
+    { status: 201 },
+  );
 }
 
 export async function GET() {
   return NextResponse.json({ items: await getExplorerItems() });
 }
 
-export async function POST(request: Request) {
+async function publishContent(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -359,4 +376,56 @@ export async function POST(request: Request) {
   });
 
   return publishedResponse(dashboard, "dashboard", data.slug);
+}
+
+function isDatabaseUnavailable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return [
+    "connection pool",
+    "Server has closed the connection",
+    "Connection reset",
+    "connect_timeout",
+    "ECONNRESET",
+    "Can't reach database server",
+  ].some((fragment) => message.includes(fragment));
+}
+
+export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+  try {
+    return await publishContent(request);
+  } catch (error) {
+    console.error(`[content:${requestId}] Publish failed`, error);
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        {
+          error: "Invalid JSON payload.",
+          message: "The publishing request could not be parsed.",
+          requestId,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (isDatabaseUnavailable(error)) {
+      return NextResponse.json(
+        {
+          error: "Failed to publish content.",
+          message: "The database is temporarily unavailable. Retry in a moment.",
+          requestId,
+        },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Failed to publish content.",
+        message: "The server could not save the content.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
 }

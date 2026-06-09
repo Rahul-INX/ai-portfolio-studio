@@ -28,6 +28,7 @@ import {
   CheckSquare,
   Table,
 } from "lucide-react";
+import { readApiResponse } from "@/lib/api-response";
 import { slugifySection } from "@/lib/citations";
 
 /* ─── Types ───────────────────────────────────────────────────────── */
@@ -251,33 +252,21 @@ async function renderMarkdown(source: string): Promise<string> {
 
 async function uploadImage(file: File): Promise<string | null> {
   // Validate client-side
-  const maxSize = 5 * 1024 * 1024; // 5 MB
+  const maxSize = 4 * 1024 * 1024;
   const allowedTypes = [
     "image/jpeg",
     "image/png",
     "image/gif",
     "image/webp",
-    "image/svg+xml",
   ];
   if (!allowedTypes.includes(file.type) || file.size > maxSize) return null;
 
   const form = new FormData();
   form.append("file", file);
 
-  try {
-    const response = await fetch("/api/media", { method: "POST", body: form });
-    if (!response.ok) return null;
-    const data = (await response.json()) as { url?: string };
-    return data.url ?? null;
-  } catch {
-    // Fallback: data URI
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
-  }
+  const response = await fetch("/api/media", { method: "POST", body: form });
+  const data = await readApiResponse<{ url?: string }>(response);
+  return data.url ?? null;
 }
 
 /* ─── Component ───────────────────────────────────────────────────── */
@@ -390,8 +379,12 @@ export function MarkdownEditor({
           if (!ta) continue;
 
           setUploadProgress("Uploading image…");
-          const url = await uploadImage(file);
-          setUploadProgress(null);
+          let url: string | null = null;
+          try {
+            url = await uploadImage(file);
+          } finally {
+            setUploadProgress(null);
+          }
 
           if (url) {
             const alt = file.name?.replace(/\.[^.]+$/, "") || "image";
@@ -434,14 +427,17 @@ export function MarkdownEditor({
 
       setUploadProgress(`Uploading ${files.length} image(s)…`);
       const urls: string[] = [];
-      for (const file of files) {
-        const url = await uploadImage(file);
-        if (url) {
-          const alt = file.name?.replace(/\.[^.]+$/, "") || "image";
-          urls.push(`![${alt}](${url})`);
+      try {
+        for (const file of files) {
+          const url = await uploadImage(file);
+          if (url) {
+            const alt = file.name?.replace(/\.[^.]+$/, "") || "image";
+            urls.push(`![${alt}](${url})`);
+          }
         }
+      } finally {
+        setUploadProgress(null);
       }
-      setUploadProgress(null);
 
       if (urls.length) {
         insertAtCursor(ta, value, onChange, urls.join("\n\n"));

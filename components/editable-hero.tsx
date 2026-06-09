@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, BarChart3, Database, SearchCheck, ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
 import { EditableSection } from "@/components/editable-section";
+import { readApiResponse } from "@/lib/api-response";
 import type { SiteProfile } from "@/lib/types";
 
 const signals = [
@@ -34,10 +35,7 @@ export function EditableHero({ profile }: { profile: SiteProfile }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "site-profile", ...draft, id: undefined })
       });
-      const result = (await response.json()) as { error?: unknown };
-      if (!response.ok) {
-        throw new Error(typeof result.error === "string" ? result.error : "The profile did not pass validation.");
-      }
+      await readApiResponse(response);
       setStatus("saved");
       setMessage("Saved and published");
       router.refresh();
