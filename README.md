@@ -28,7 +28,7 @@ npm.cmd run prisma:push
 npm.cmd run prisma:seed
 ```
 
-Set `CLOUDINARY_CLOUD_NAME` when dashboard/gallery image records should use Cloudinary public IDs. Fully-qualified `https://...` and local `/media/...` URLs are also accepted.
+Set `CLOUDINARY_CLOUD_NAME` when dashboard/gallery image records should use Cloudinary public IDs. Production media uploads also require either `CLOUDINARY_UPLOAD_PRESET` (an unsigned preset) or both `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`. Fully-qualified `https://...` and local `/media/...` URLs are also accepted. Uploaded images must be 4 MB or smaller to remain below Vercel's request-body limit.
 
 ## Content Safety
 
