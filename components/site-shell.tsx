@@ -1,26 +1,30 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { LogIn, Mail, MapPin, Settings, Phone } from "lucide-react";
+import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { PortfolioAssistant } from "@/components/portfolio-assistant";
 import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NavigationFeedback } from "@/components/navigation-feedback";
+import { EditModeProvider } from "@/components/edit-mode-provider";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { safeSiteProfile } from "@/lib/safe-content";
 import type { SiteProfile } from "@/lib/types";
 
 const nav = [
+  { href: "/explorer", label: "Systems Explorer" },
+  { href: "/timeline", label: "Experience" },
   { href: "/timeline#resume-downloads", label: "Resume" },
-  { href: "/explorer", label: "Explorer" },
-  { href: "/timeline", label: "Timeline" },
   { href: "/job-fit", label: "Check Job Fit", shortLabel: "Job Fit" },
-  { href: "/admin", label: "Admin" }
 ];
 
 function telHref(phone?: string | null) {
   return phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
 }
 
-export function SiteShell({ children, profile = safeSiteProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
+export async function SiteShell({ children, profile = safeSiteProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
+  const session = await getServerSession(authOptions);
   const contactItems = [
     profile.contactEmail ? { label: profile.contactEmail, href: `mailto:${profile.contactEmail}`, icon: Mail } : null,
     profile.contactPhone ? { label: profile.contactPhone, href: telHref(profile.contactPhone), icon: Phone } : null,
@@ -36,19 +40,21 @@ export function SiteShell({ children, profile = safeSiteProfile }: { children: R
   ].filter(Boolean) as Array<{ label: string; href: string; icon: typeof GitHubIcon; colorClass: string }>;
 
   return (
+    <EditModeProvider authenticated={Boolean(session?.user?.id)}>
     <div className="min-h-screen">
       <NavigationFeedback />
       <a
         href="#main"
+        tabIndex={0}
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[var(--panel-strong)] focus:px-4 focus:py-2"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b hairline bg-[color-mix(in_srgb,var(--background),transparent_4%)] shadow-[0_8px_32px_rgba(8,13,11,0.04)] backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b hairline bg-[color-mix(in_srgb,var(--background),transparent_6%)] backdrop-blur-xl">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
-          <div className="flex min-h-[4.5rem] items-center justify-between gap-4 py-3">
+          <div className="flex min-h-[4rem] items-center justify-between gap-4 py-2.5">
             <Link href="/" className="group flex min-w-0 items-center gap-3" aria-label="Home">
-              <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md border hairline bg-ink-900 text-sm font-semibold text-ink-50 shadow-sm dark:bg-ink-50 dark:text-ink-900">
+              <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border hairline bg-ink-900 text-xs font-semibold text-ink-50 dark:bg-ink-50 dark:text-ink-900">
                 {profile.profileImageUrl ? (
                   <Image
                     src={profile.profileImageUrl}
@@ -91,6 +97,18 @@ export function SiteShell({ children, profile = safeSiteProfile }: { children: R
                 })}
               </div>
               <ThemeToggle />
+              {session?.user ? (
+                <>
+                  <Link href="/admin" aria-label="Open portfolio admin" title="Admin" className="grid h-9 w-9 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--foreground)]">
+                    <Settings aria-hidden className="h-4 w-4" />
+                  </Link>
+                  <AdminLogoutButton compact />
+                </>
+              ) : (
+                <Link href="/admin/login" aria-label="Admin sign in" title="Admin sign in" className="grid h-9 w-9 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--foreground)]">
+                  <LogIn aria-hidden className="h-4 w-4" />
+                </Link>
+              )}
             </div>
           </div>
 
@@ -116,6 +134,14 @@ export function SiteShell({ children, profile = safeSiteProfile }: { children: R
                   )}
                 </Link>
               ))}
+              {session?.user ? (
+                <Link
+                  href="/admin"
+                  className="shrink-0 rounded-md px-2.5 py-2 text-xs font-semibold text-cobalt-600 transition hover:bg-[var(--panel)] hover:text-cobalt-700 sm:px-3 sm:text-sm dark:text-cobalt-300 dark:hover:text-cobalt-200"
+                >
+                  Admin CMS
+                </Link>
+              ) : null}
             </nav>
 
             {contactItems.length ? (
@@ -145,7 +171,7 @@ export function SiteShell({ children, profile = safeSiteProfile }: { children: R
           </div>
 
           {contactItems.length ? (
-            <div className="flex min-w-0 gap-4 overflow-x-auto border-t hairline py-2 text-xs text-[var(--muted)] [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden">
+            <div className="hidden min-w-0 gap-4 overflow-x-auto border-t hairline py-2 text-xs text-[var(--muted)] [scrollbar-width:none] md:flex xl:hidden [&::-webkit-scrollbar]:hidden">
               {socialItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -186,7 +212,8 @@ export function SiteShell({ children, profile = safeSiteProfile }: { children: R
         </div>
       </header>
       <main id="main">{children}</main>
-      <PortfolioAssistant />
+      <PortfolioAssistant ownerName={profile.name} />
     </div>
+    </EditModeProvider>
   );
 }

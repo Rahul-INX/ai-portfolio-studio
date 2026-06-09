@@ -6,7 +6,7 @@ import {
   ArrowUpRight,
   BarChart3,
   CheckCircle2,
-  CircleDot,
+  ChevronDown,
   FileText,
   Gauge,
   Loader2,
@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { JobFitResult } from "@/lib/job-fit";
 
 const samplePrompt =
-  "Paste a JD for a GenAI, RAG, data science, ML engineer, NLP, backend AI, or analytics role. The brief will compare it against public portfolio evidence only.";
+  "Paste any complete job description. The evaluator derives a role-specific rubric from its responsibilities, requirements, seniority, domain, and preferred qualifications.";
 const generationStages = [
   "Reading role requirements",
   "Retrieving portfolio evidence",
@@ -42,138 +42,138 @@ function statusTone(status: string) {
   return "text-rose-700 dark:text-rose-300";
 }
 
-function alignmentTone(status: JobFitResult["alignmentNotes"][number]["status"]) {
-  if (status === "Aligned") return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300" };
-  if (status === "Partial") return { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300" };
-  return { dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-300" };
-}
-
 function ResultPanel({ result }: { result: JobFitResult }) {
-  const positiveDimensions = result.dimensions.slice(0, 7);
-  const gapDimension = result.dimensions[7];
+  const [activeView, setActiveView] = useState<"criteria" | "evidence" | "interview">("criteria");
+  const rankedDimensions = [...result.dimensions].sort((a, b) => b.weight - a.weight || a.score - b.score);
+  const strongest = [...result.dimensions].filter((item) => item.score >= 52).sort((a, b) => b.score * b.weight - a.score * a.weight).slice(0, 3);
+  const materialGaps = rankedDimensions.filter((item) => item.score < 52).slice(0, 3);
   const alignedNotes = result.alignmentNotes.filter((item) => item.status === "Aligned");
   const reviewNotes = result.alignmentNotes.filter((item) => item.status !== "Aligned");
+  const evidenceGrade = (score: number) => score >= 80 ? "A" : score >= 65 ? "B" : score >= 50 ? "C" : score >= 30 ? "D" : "Unproven";
+  const decision = result.overallScore >= 78 ? "Strong evidence to proceed" : result.overallScore >= 58 ? "Proceed to focused interview" : result.overallScore >= 35 ? "Proceed with caution" : "Insufficient public evidence";
 
   return (
-    <div className="min-w-0 space-y-4 overflow-hidden" aria-live="polite">
-      <section className="surface rounded-lg p-5">
-        <div className="grid min-w-0 items-center gap-5 md:grid-cols-[minmax(13rem,0.32fr)_minmax(0,0.68fr)]">
-          <div className="min-w-0 md:border-r md:pr-5 hairline">
-            <div className="flex items-center gap-2">
-              <Gauge aria-hidden className="h-5 w-5 text-cobalt-500" />
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-                Overall Fit
-              </p>
+    <div className="job-fit-dossier min-w-0 space-y-4 overflow-hidden" aria-live="polite">
+      <section className="surface overflow-hidden rounded-xl">
+        <div className="grid gap-6 border-b hairline p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-end">
+          <div>
+            <p className="eyebrow">Decision</p>
+            <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{decision}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">{result.verdict}</p>
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--muted)]">
+              <span><strong className="text-[var(--foreground)]">{alignedNotes.length}</strong> aligned criteria</span>
+              <span><strong className="text-[var(--foreground)]">{reviewNotes.length}</strong> need validation</span>
+              <span><strong className="text-[var(--foreground)]">{result.topEvidence.length}</strong> cited sources</span>
+              <span>{result.mode === "specialist-agent" ? "Specialist analysis" : "Deterministic analysis"}</span>
             </div>
-            <div className="mt-5 flex items-end gap-3">
-              <span className="text-6xl font-semibold tracking-normal tabular-nums">{result.overallScore}</span>
+          </div>
+          <div className="border-t hairline pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <div className="flex items-end gap-2">
+              <span className="text-6xl font-semibold tracking-[-0.06em] tabular-nums">{result.overallScore}</span>
               <span className="pb-2 text-sm text-[var(--muted)]">/ 100</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-md border hairline bg-[var(--panel-strong)] px-3 py-1.5 text-sm font-semibold">
-                {result.fitLabel}
-              </span>
-              <span className="rounded-md border hairline px-3 py-1.5 text-sm text-[var(--muted)]">
-                {result.confidence} confidence
-              </span>
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border hairline px-2.5 py-1 font-mono text-[0.68rem] uppercase tracking-[0.12em] text-[var(--muted)]">
-                {result.mode === "specialist-agent" ? "Resume Match Specialist" : "Deterministic fallback"}
-              </span>
-              <span className="text-xs text-[var(--muted)]">
-                {alignedNotes.length} aligned / {reviewNotes.length} to validate
-              </span>
-            </div>
-            <p className="mt-3 break-words text-base leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_18%)]">
-              {result.verdict}
-            </p>
+            <p className="mt-2 text-sm font-semibold">{result.fitLabel}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">{result.confidence} confidence</p>
           </div>
         </div>
 
-        <div className="mt-5 border-t hairline pt-5">
-          <div className="mb-4 flex items-center gap-2">
-            <BarChart3 aria-hidden className="h-4 w-4 text-cobalt-500" />
-            <h2 className="text-sm font-semibold">Fit Dimensions</h2>
+        <div className="grid divide-y divide-[var(--line)] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <div className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Proven strengths</p>
+            <ul className="mt-3 space-y-2 text-sm leading-5">
+              {strongest.length ? strongest.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">No criterion has sufficient direct evidence.</li>}
+            </ul>
           </div>
-          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
-            {positiveDimensions.map((dimension) => (
-              <div key={dimension.name} className="min-w-0">
-                <div className="mb-1.5 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 text-xs">
-                  <span className="min-w-0 break-words font-medium leading-4">{dimension.name}</span>
-                  <span className={`font-mono leading-4 ${statusTone(dimension.status)}`}>
-                    {dimension.score}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground),transparent_90%)]">
-                  <div
-                    className={`h-full rounded-full ${scoreTone(dimension.score)}`}
-                    style={{ width: `${dimension.score}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+          <div className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--signal)]">Decision risks</p>
+            <ul className="mt-3 space-y-2 text-sm leading-5">
+              {materialGaps.length ? materialGaps.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">No material evidence gaps detected.</li>}
+            </ul>
           </div>
-          <div className="mt-5 grid gap-2 border-t hairline pt-4 md:grid-cols-[minmax(11rem,0.25fr)_minmax(0,0.75fr)] md:items-start">
-            <p className="break-words text-xs font-semibold">{gapDimension.name}</p>
-            <p className="break-words text-xs leading-5 text-[var(--muted)]">{gapDimension.rationale}</p>
+          <div className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">Recommended next step</p>
+            <p className="mt-3 text-sm leading-6">{result.interviewQuestions[0]}</p>
           </div>
         </div>
       </section>
 
-      <section className="surface rounded-lg p-5">
+      <nav className="surface sticky top-16 z-20 grid grid-cols-3 gap-1 rounded-xl p-1.5 shadow-quiet" aria-label="Fit brief sections">
+        {[
+          { id: "criteria", label: "Criteria", count: result.dimensions.length },
+          { id: "evidence", label: "Evidence", count: result.topEvidence.length },
+          { id: "interview", label: "Interview", count: result.interviewQuestions.length }
+        ].map((view) => (
+          <button
+            key={view.id}
+            type="button"
+            onClick={() => setActiveView(view.id as typeof activeView)}
+            aria-pressed={activeView === view.id}
+            className={`flex min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold transition ${
+              activeView === view.id
+                ? "bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-950"
+                : "text-[var(--muted)] hover:bg-[var(--surface-support)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <span>{view.label}</span>
+            <span className={`rounded-full px-1.5 py-0.5 font-mono text-[0.62rem] ${activeView === view.id ? "bg-white/15 dark:bg-black/10" : "bg-[var(--surface-support)]"}`}>
+              {view.count}
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      <section className={`${activeView === "criteria" ? "block" : "hidden"} surface max-h-[38rem] overflow-y-auto overscroll-contain rounded-xl p-5 sm:p-6`}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <CircleDot aria-hidden className="h-5 w-5 text-cobalt-500" />
-              <h2 className="text-base font-semibold">Points to Note</h2>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              JD requirements separated by direct public evidence and items that still need validation.
-            </p>
+            <p className="eyebrow">Highest-weight requirements</p>
+            <h2 className="mt-2 text-xl font-semibold">The criteria most likely to change the hiring decision.</h2>
           </div>
-          <span className="rounded-full border hairline px-3 py-1 font-mono text-xs text-[var(--muted)]">
-            {alignedNotes.length} aligned / {reviewNotes.length} to validate
-          </span>
+          <span className="text-xs text-[var(--muted)]">{result.dimensions.length} criteria extracted from this JD</span>
         </div>
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          {[
-            { title: "What aligns", items: alignedNotes, empty: "No direct public alignment was found.", titleClass: "text-emerald-700 dark:text-emerald-300" },
-            { title: "What needs validation", items: reviewNotes, empty: "All extracted requirements have direct public evidence.", titleClass: "text-amber-700 dark:text-amber-300" }
-          ].map((group) => (
-            <div key={group.title} className="rounded-md border hairline bg-[var(--panel-strong)] p-4">
-              <h3 className={`text-sm font-semibold ${group.titleClass}`}>{group.title}</h3>
-              {group.items.length ? (
-                <ul className="mt-3 space-y-3">
-                  {group.items.map((item) => {
-                    const tone = alignmentTone(item.status);
-                    return (
-                      <li key={item.requirement} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-                        <span className={`mt-2 h-2 w-2 rounded-full ${tone.dot}`} aria-hidden />
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium">{item.requirement}</p>
-                            {item.status !== "Aligned" ? <span className={`text-[0.65rem] font-semibold uppercase tracking-wide ${tone.text}`}>{item.status}</span> : null}
-                          </div>
-                          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{item.note}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{group.empty}</p>
-              )}
-            </div>
+        <div className="mt-5 overflow-hidden rounded-lg border hairline">
+          <div className="hidden grid-cols-[minmax(0,1fr)_7rem_6rem_5rem] gap-4 bg-[var(--surface-support)] px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] md:grid">
+            <span>Requirement</span><span>Priority</span><span>Evidence</span><span className="text-right">Score</span>
+          </div>
+          {rankedDimensions.slice(0, 5).map((dimension) => (
+            <article key={dimension.name} className="grid gap-3 border-t hairline p-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_7rem_6rem_5rem] md:items-center md:gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold">{dimension.name}</h3>
+                  <span className="text-[0.65rem] uppercase tracking-[0.1em] text-[var(--muted)]">{dimension.category}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{dimension.rationale}</p>
+              </div>
+              <div className="text-xs"><span className="md:hidden text-[var(--muted)]">Priority: </span>{dimension.priority}<span className="text-[var(--muted)]"> · {dimension.weight}/5</span></div>
+              <div className={`text-sm font-semibold ${statusTone(dimension.status)}`}><span className="md:hidden text-xs font-normal text-[var(--muted)]">Evidence: </span>{evidenceGrade(dimension.score)}</div>
+              <div className="flex items-center gap-3 md:block md:text-right">
+                <span className="text-lg font-semibold tabular-nums">{dimension.score}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-support)] md:mt-1.5 md:w-full">
+                  <div className={`h-full rounded-full ${scoreTone(dimension.score)}`} style={{ width: `${dimension.score}%` }} />
+                </div>
+              </div>
+            </article>
           ))}
         </div>
+        {rankedDimensions.length > 5 ? (
+          <details className="group mt-3 rounded-lg border hairline bg-[var(--panel-strong)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold">
+              Show all {rankedDimensions.length} requirements
+              <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
+            </summary>
+            <div className="border-t hairline">
+              {rankedDimensions.slice(5).map((dimension) => (
+                <div key={dimension.name} className="grid gap-2 border-t hairline px-4 py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div><p className="text-sm font-medium">{dimension.name}</p><p className="mt-1 text-xs text-[var(--muted)]">{dimension.priority} · Weight {dimension.weight}/5 · {dimension.rationale}</p></div>
+                  <span className={`text-sm font-semibold ${statusTone(dimension.status)}`}>{dimension.score} · {evidenceGrade(dimension.score)}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        ) : null}
       </section>
 
-      <section className="surface rounded-lg p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <details open className={`${activeView === "evidence" ? "block" : "hidden"} surface group max-h-[38rem] overflow-y-auto overscroll-contain rounded-xl`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-6">
           <div>
             <div className="flex items-center gap-2">
               <SearchCheck aria-hidden className="h-5 w-5 text-cobalt-500" />
@@ -181,12 +181,14 @@ function ResultPanel({ result }: { result: JobFitResult }) {
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Only site resources with verified overlap to this JD are shown.</p>
           </div>
-          <span className="rounded-full border hairline px-3 py-1 font-mono text-xs text-[var(--muted)]">
-            {result.topEvidence.length} relevant source{result.topEvidence.length === 1 ? "" : "s"}
-          </span>
-        </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[var(--muted)]">{result.topEvidence.length} cited source{result.topEvidence.length === 1 ? "" : "s"}</span>
+            <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
+          </div>
+        </summary>
+        <div className="border-t hairline px-5 pb-5 sm:px-6 sm:pb-6">
         {result.topEvidence.length ? (
-          <div className="mt-4 divide-y divide-[var(--line)] overflow-hidden rounded-md border hairline bg-[var(--panel-strong)]">
+          <div className="mt-5 divide-y divide-[var(--line)] overflow-hidden rounded-md border hairline bg-[var(--panel-strong)]">
             {result.topEvidence.map((item) => (
               <article key={`${item.title}-${item.url}`} className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
@@ -215,39 +217,40 @@ function ResultPanel({ result }: { result: JobFitResult }) {
             ))}
           </div>
         ) : (
-          <div className="mt-4 rounded-md border border-dashed hairline bg-[var(--panel-strong)] p-5">
+          <div className="mt-5 rounded-md border border-dashed hairline bg-[var(--panel-strong)] p-5">
             <p className="text-sm font-medium">No relevant public evidence found</p>
             <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
               No site resource met the verified-overlap threshold. Requirements remain unproven instead of being matched to nearby content.
             </p>
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="surface rounded-lg p-5">
+      <div className={`${activeView === "interview" ? "grid" : "hidden"} max-h-[38rem] gap-4 overflow-y-auto overscroll-contain lg:grid-cols-2`}>
+        <section className="surface rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <AlertCircle aria-hidden className="h-5 w-5 text-amber-500" />
             <h2 className="text-base font-semibold">Gap Analysis</h2>
           </div>
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-4 divide-y divide-[var(--line)] border-y hairline">
             {result.gaps.map((gap) => (
-              <li key={gap} className="break-words rounded-md border hairline bg-[var(--panel-strong)] p-3 text-sm leading-6 text-[var(--muted)]">
+              <li key={gap} className="break-words py-3 text-sm leading-6 text-[var(--muted)]">
                 {gap}
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="surface rounded-lg p-5">
+        <section className="surface rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <CheckCircle2 aria-hidden className="h-5 w-5 text-emerald-500" />
             <h2 className="text-base font-semibold">Interview Probes</h2>
           </div>
-          <ol className="mt-4 space-y-3">
+          <ol className="mt-4 divide-y divide-[var(--line)] border-y hairline">
             {result.interviewQuestions.map((question, index) => (
-              <li key={question} className="break-words rounded-md border hairline bg-[var(--panel-strong)] p-3 text-sm leading-6 text-[var(--muted)]">
-                <span className="mr-2 font-mono text-xs text-cobalt-500">{String(index + 1).padStart(2, "0")}</span>
+              <li key={question} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2 py-3 text-sm leading-6 text-[var(--muted)]">
+                <span className="font-mono text-xs text-[var(--accent)]">{String(index + 1).padStart(2, "0")}</span>
                 {question}
               </li>
             ))}
@@ -255,17 +258,18 @@ function ResultPanel({ result }: { result: JobFitResult }) {
         </section>
       </div>
 
-      <section className="surface rounded-lg p-5">
-        <div className="flex items-center gap-2">
-          <ShieldCheck aria-hidden className="h-5 w-5 text-cobalt-500" />
-          <h2 className="text-base font-semibold">Unbiased Notes</h2>
-        </div>
-        <ul className="mt-4 grid gap-2 text-sm leading-6 text-[var(--muted)] md:grid-cols-2">
-          {result.fairnessNotes.map((note) => (
-            <li key={note} className="break-words rounded-md border hairline bg-[var(--panel-strong)] p-3">{note}</li>
-          ))}
+      <details className={`${activeView === "interview" ? "block" : "hidden"} surface group rounded-xl`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between p-5 sm:px-6">
+          <div className="flex items-center gap-2">
+            <ShieldCheck aria-hidden className="h-5 w-5 text-[var(--accent)]" />
+            <h2 className="text-base font-semibold">Methodology and Unbiased Notes</h2>
+          </div>
+          <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
+        </summary>
+        <ul className="grid gap-3 border-t hairline p-5 text-sm leading-6 text-[var(--muted)] md:grid-cols-2 sm:p-6">
+          {result.fairnessNotes.map((note) => <li key={note}>{note}</li>)}
         </ul>
-      </section>
+      </details>
     </div>
   );
 }
@@ -411,7 +415,6 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
             <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Supports .txt, .pdf, and .docx up to 4 MB.</span>
             <input
               type="file"
-              accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               className="mt-3 block w-full min-w-0 max-w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-ink-900 file:px-3 file:py-2 file:text-xs file:font-medium file:text-white dark:file:bg-ink-50 dark:file:text-ink-950"
             />
@@ -426,7 +429,7 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
 
           <button
             type="submit"
-            disabled={loading || !canSubmit}
+            disabled={loading}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-ink-50 dark:text-ink-950"
           >
             {loading ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <SearchCheck aria-hidden className="h-4 w-4" />}
@@ -481,7 +484,7 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { icon: Gauge, label: "Fit score", value: "0-100" },
-                { icon: BarChart3, label: "Dimensions", value: "8 fixed factors" },
+                { icon: BarChart3, label: "Rubric", value: "Derived from this JD" },
                 { icon: ShieldCheck, label: "Evidence", value: "Public site data" }
               ].map((item) => (
                 <div key={item.label} className="rounded-md border hairline bg-[var(--panel-strong)] p-4">

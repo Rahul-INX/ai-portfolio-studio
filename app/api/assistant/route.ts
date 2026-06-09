@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { evidenceBlock, gatherPortfolioContext, sourcesBlock, type ContextGatheringResult } from "@/lib/site-context";
+import { getSiteProfile } from "@/lib/content";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -20,7 +21,7 @@ const streamHeaders = {
   "X-Accel-Buffering": "no"
 };
 
-function fallbackAnswer(_message: string, context: ContextGatheringResult) {
+function fallbackAnswer(_message: string, context: ContextGatheringResult, ownerName: string) {
   const documents = context.evidence.filter((item) => item.kind === "document" && item.fileUrl);
   if (documents.length) {
     return [
@@ -30,7 +31,7 @@ function fallbackAnswer(_message: string, context: ContextGatheringResult) {
       "",
       "You can also use the document hub and CV page for section-level context:",
       "- [Resume & CV Downloads](/timeline#resume-downloads)",
-      "- [Rahul Harivansh Fatyal CV - Summary](/cv#summary)",
+      `- [${ownerName} CV - Summary](/cv#summary)`,
       "",
       "Sources",
       sourcesBlock(context.evidence.slice(0, 6))
@@ -104,15 +105,16 @@ export async function POST(request: Request) {
   }
 
   const context = await gatherPortfolioContext(parsed.data.message, parsed.data.path);
+  const profile = await getSiteProfile();
   const contextBlock = evidenceBlock(context.evidence);
 
   if (!process.env.OPENAI_API_KEY) {
-    return new Response(streamText(fallbackAnswer(parsed.data.message, context)), {
+    return new Response(streamText(fallbackAnswer(parsed.data.message, context, profile.name)), {
       headers: { ...streamHeaders, "X-Assistant-Mode": "local-fallback" }
     });
   }
 
-  const systemContent = `You are Rahul Harivansh Fatyal's portfolio assistant. Answer only from gathered portfolio evidence. The visible chat is the main agent; background site context gathering has already happened, so do not mention sub-agents or internal retrieval mechanics.
+  const systemContent = `You are ${profile.name}'s portfolio assistant. Answer only from gathered portfolio evidence. The visible chat is the main agent; background site context gathering has already happened, so do not mention sub-agents or internal retrieval mechanics.
 
 Rules:
 - Use current-page evidence first when it is sufficient.
@@ -174,7 +176,7 @@ Question: ${parsed.data.message}`
   });
 
   if (!response.ok || !response.body) {
-    return new Response(streamText(fallbackAnswer(parsed.data.message, context)), {
+    return new Response(streamText(fallbackAnswer(parsed.data.message, context, profile.name)), {
       headers: { ...streamHeaders, "X-Assistant-Mode": "openai-fallback" }
     });
   }

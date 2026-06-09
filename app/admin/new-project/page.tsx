@@ -43,12 +43,12 @@ export default async function NewProjectPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">CMS</p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-normal">Editable content studio</h1>
+            <h1 className="mt-4 text-4xl font-semibold tracking-normal">Advanced content studio</h1>
           </div>
           <AdminLogoutButton />
         </div>
         <p className="mt-4 max-w-2xl leading-7 text-[var(--muted)]">
-          Edit the public profile, projects, case studies, experiments, blogs, dashboards, skills, certifications, and timeline records without touching source files.
+          Use live-page editing for common changes. This studio remains available for blogs, structured records, uploads, bulk work, and recovery.
         </p>
         <ContentStudioForm
           data={{ profile, projects, caseStudies, experiments, blogs, dashboards, skills, certifications, timeline, documents }}

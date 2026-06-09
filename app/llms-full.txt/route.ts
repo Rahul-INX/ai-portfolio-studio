@@ -1,10 +1,11 @@
 import { buildSiteContextItems } from "@/lib/site-context";
+import { getSiteProfile } from "@/lib/content";
 
 export async function GET() {
-  const items = await buildSiteContextItems();
+  const [items, profile] = await Promise.all([buildSiteContextItems(), getSiteProfile()]);
 
   const lines = [
-    "# Rahul Harivansh Fatyal",
+    `# ${profile.name}`,
     "",
     "Full AI-readable portfolio bundle. Every section includes a canonical section URL for citation and direct navigation.",
     "",

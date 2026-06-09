@@ -50,3 +50,40 @@ __pycache__/
 # local data
 Data/
 docs/
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+.next-stale-*/
+
+# Vercel
+.vercel/
+
+# Build
+dist/
+build/
+out/
+
+# Uploads
+public/uploads/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

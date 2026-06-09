@@ -1,6 +1,6 @@
 # Portfolio Platform
 
-Production-quality personal portfolio and knowledge hub for a Senior AI Engineer / Data Scientist.
+Reusable personal portfolio and evidence hub with JD-derived recruiter matching and an authenticated CMS.
 
 ## Stack
 
@@ -54,5 +54,19 @@ The authenticated admin studio supports:
 - Skills
 - Certifications
 - Timeline events
+- Site owner identity, contact details, hero copy, page introductions, and SEO metadata
+- Resume/CV documents and project repository/demo links
 
 Public pages read from Prisma when `DATABASE_URL` is configured and fall back to portfolio-safe seed content for local preview.
+
+## Rebrand A Fork
+
+1. Configure a new PostgreSQL database and unique `NEXTAUTH_SECRET`.
+2. Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD`; never deploy the seed defaults.
+3. Run `npm.cmd run prisma:push` and `npm.cmd run prisma:seed`.
+4. Sign in from the header account icon or `/admin/login`.
+5. Update **Site Profile** first. This drives the visible owner name, role, contact details, metadata, manifest, assistant identity, Job-Fit wording, CV heading, and AI-readable feeds.
+6. Replace projects, timeline records, skills, certifications, documents, writing, case studies, experiments, and dashboards through the studio.
+7. Upload the new portrait and resume/CV documents before publishing.
+
+Authenticated users can enable edit mode from public pages. Hero fields edit in context; projects, skills, and timeline records expose contextual edit links that open the existing studio with the correct record selected.

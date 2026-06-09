@@ -6,6 +6,10 @@ export const confidenceLevels = ["High", "Medium", "Low"] as const;
 
 export const jobFitDimensionSchema = z.object({
   name: z.string().min(3),
+  category: z.enum(["Responsibility", "Technical", "Experience", "Domain", "Delivery", "Collaboration", "Other"]),
+  priority: z.enum(["Must have", "Preferred", "Context"]),
+  weight: z.number().int().min(1).max(5),
+  evidenceStandard: z.string().min(8),
   score: z.number().int().min(0).max(100),
   status: z.enum(["Strong", "Moderate", "Limited", "Missing"]),
   rationale: z.string().min(12),
@@ -37,7 +41,7 @@ export const jobFitResultSchema = z.object({
   fitLabel: z.enum(fitLabels),
   confidence: z.enum(confidenceLevels),
   verdict: z.string().min(20),
-  dimensions: z.array(jobFitDimensionSchema).min(8).max(8),
+  dimensions: z.array(jobFitDimensionSchema).min(3).max(12),
   topEvidence: z.array(jobFitEvidenceSchema).max(6),
   alignmentNotes: z.array(jobFitAlignmentNoteSchema).min(1).max(12),
   gaps: z.array(z.string()).min(1).max(8),
@@ -48,17 +52,6 @@ export const jobFitResultSchema = z.object({
 });
 
 export type JobFitResult = z.infer<typeof jobFitResultSchema>;
-
-export const jobFitDimensionNames = [
-  "GenAI / RAG alignment",
-  "Data science and ML alignment",
-  "Backend/API/product engineering",
-  "NLP, retrieval, and vector search",
-  "Evidence depth from shipped projects",
-  "Communication, documentation, and product thinking",
-  "Domain adaptability",
-  "Gaps or unproven areas"
-] as const;
 
 const stopwords = new Set([
   "about",
@@ -119,6 +112,142 @@ const requirementCatalog = [
   { requirement: "Communication and tradeoffs", aliases: ["communicate", "communication", "tradeoff", "stakeholder"], related: ["documentation", "case study", "explainable"] },
   { requirement: "Leadership / ownership", aliases: ["leadership", "lead", "ownership", "own end to end"], related: ["coordination", "team", "ncc"] }
 ] as const;
+
+type RubricCriterion = {
+  name: string;
+  aliases: readonly string[];
+  related: readonly string[];
+  category: JobFitResult["dimensions"][number]["category"];
+  priority: JobFitResult["dimensions"][number]["priority"];
+  weight: number;
+  evidenceStandard: string;
+};
+
+function criterionCategory(name: string): RubricCriterion["category"] {
+  const value = normalize(name);
+  if (/(lead|communicat|stakeholder|mentor|collaborat|team)/.test(value)) return "Collaboration";
+  if (/(year|experience|senior|track record)/.test(value)) return "Experience";
+  if (/(deliver|production|deploy|monitor|quality|test|own)/.test(value)) return "Delivery";
+  if (/(domain|health|finance|retail|energy|legal|compliance)/.test(value)) return "Domain";
+  if (/(responsib|design|build|develop|manage|implement|architect)/.test(value)) return "Responsibility";
+  if (/(python|java|sql|api|cloud|docker|react|angular|model|data|ai|ml|nlp|rag|vector)/.test(value)) return "Technical";
+  return "Other";
+}
+
+function priorityFor(text: string): Pick<RubricCriterion, "priority" | "weight"> {
+  const value = normalize(text);
+  if (/(must|required|minimum|needs?|need to|responsible for|you will)/.test(value)) return { priority: "Must have", weight: 5 };
+  if (/(preferred|nice to have|bonus|plus)/.test(value)) return { priority: "Preferred", weight: 2 };
+  return { priority: "Context", weight: 3 };
+}
+
+function evidenceStandard(category: RubricCriterion["category"]) {
+  if (category === "Technical") return "Direct skill plus project or implementation evidence.";
+  if (category === "Experience") return "Timeline, role, or dated project evidence with comparable scope.";
+  if (category === "Delivery") return "Shipped outcome, operating constraint, metric, or production responsibility.";
+  if (category === "Collaboration") return "Role, ownership, leadership, stakeholder, or team evidence.";
+  if (category === "Domain") return "Direct domain work; adjacent technology alone is insufficient.";
+  return "Direct portfolio evidence demonstrating the stated requirement.";
+}
+
+function cleanCriterion(value: string) {
+  return value
+    .replace(/^[\s•*\-\d.)]+/, "")
+    .replace(/^(requirements?|qualifications?|responsibilities?|skills?)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 110);
+}
+
+function sentenceCriterionName(value: string) {
+  const sentence = cleanCriterion(value)
+    .replace(/^(?:you|the (?:candidate|person|engineer|role)|this role)\s+(?:will|must|should|needs? to|is responsible for)\s+/i, "")
+    .replace(/^(?:must|should|required to|responsible for)\s+/i, "")
+    .replace(/[.;:]+$/, "");
+  const normalized = normalize(sentence);
+
+  if (/\bsoftware\b/.test(normalized) && /\b(users?|customers?|business outcomes?|business impact)\b/.test(normalized)) {
+    return "Software delivery and business impact";
+  }
+  if (/\b(reliability|maintainability|availability|quality)\b/.test(normalized) && /\b(production|software|systems?|services?)\b/.test(normalized)) {
+    return "Production reliability and quality";
+  }
+  if (/\b(stakeholders?|communicat|collaborat|cross functional)\b/.test(normalized)) {
+    return "Stakeholder communication and collaboration";
+  }
+  if (/\b(lead|leadership|mentor|ownership|own end to end)\b/.test(normalized)) {
+    return "Technical leadership and ownership";
+  }
+
+  const objectPhrase = sentence
+    .replace(/^(?:(?:design|build|develop|implement|create|deliver|test|maintain|manage|lead|own|support|improve|drive|ensure|work)(?:ing)?(?:,\s*|\s+and\s+|\s+))+/i, "")
+    .split(/\s+(?:that|which|so that|in order to)\s+/i)[0]
+    .trim();
+  const candidate = objectPhrase.length >= 8 ? objectPhrase : sentence;
+  const words = candidate.split(/\s+/).slice(0, 9).join(" ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function buildJobRubric(jdText: string): RubricCriterion[] {
+  const catalogMatches: RubricCriterion[] = requirementCatalog
+    .filter((item) => item.aliases.some((alias) => containsPhrase(jdText, alias)))
+    .map((item) => {
+      const source = item.aliases.find((alias) => containsPhrase(jdText, alias)) ?? item.requirement;
+      const priority = priorityFor(jdText.split(/(?<=[.!?;\n])/).find((line) => containsPhrase(line, source)) ?? "");
+      const category = criterionCategory(item.requirement);
+      return {
+        name: item.requirement,
+        aliases: item.aliases,
+        related: item.related,
+        category,
+        ...priority,
+        evidenceStandard: evidenceStandard(category)
+      };
+    });
+
+  const sentenceCandidates = jdText
+    .split(/\r?\n|(?<=[.;])\s+/)
+    .map(cleanCriterion)
+    .filter((line) => line.length >= 18 && line.length <= 110)
+    .filter((line) => /(must|required|preferred|nice to have|bonus|responsib|experience|proficien|ability|knowledge|build|design|lead|manage|develop)/i.test(line))
+    .map((line): RubricCriterion => {
+      const category = criterionCategory(line);
+      return {
+        name: sentenceCriterionName(line),
+        aliases: extractJobTerms(line).slice(0, 6),
+        related: [],
+        category,
+        ...priorityFor(line),
+        evidenceStandard: evidenceStandard(category)
+      };
+    });
+
+  const fallback = extractJobTerms(jdText).slice(0, 8).map((term): RubricCriterion => {
+    const name = term.replace(/\b\w/g, (character) => character.toUpperCase());
+    const category = criterionCategory(name);
+    return {
+      name,
+      aliases: [term],
+      related: [],
+      category,
+      priority: "Context",
+      weight: 3,
+      evidenceStandard: evidenceStandard(category)
+    };
+  });
+
+  const seen = new Set<string>();
+  const substantive = [...catalogMatches, ...sentenceCandidates];
+  return [...substantive, ...(substantive.length < 3 ? fallback : [])]
+    .filter((item) => {
+      const key = normalize(item.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 12);
+}
 
 function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9+#.\s-]/g, " ");
@@ -209,16 +338,11 @@ export function buildRequirementAlignment(
   jdText: string,
   evidence: ContextEvidence[]
 ): JobFitResult["alignmentNotes"] {
-  const requested = requirementCatalog.filter((item) =>
-    item.aliases.some((alias) => containsPhrase(jdText, alias))
-  );
-  const requirements = requested.length
-    ? requested
-    : extractJobTerms(jdText).slice(0, 6).map((term) => ({
-        requirement: term.replace(/\b\w/g, (character) => character.toUpperCase()),
-        aliases: [term],
-        related: [] as string[]
-      }));
+  const requirements = buildJobRubric(jdText).map((item) => ({
+    requirement: item.name,
+    aliases: item.aliases,
+    related: item.related
+  }));
 
   return requirements.slice(0, 12).map((requirement) => {
     const directSources = evidence.filter((item) =>
@@ -312,55 +436,61 @@ export function deterministicJobFit(
     .sort((a, b) => b.score - a.score)
     .slice(0, 6);
 
-  const evidenceCoverage = Math.min(100, Math.round((scored.reduce((sum, item) => sum + item.score, 0) / Math.max(terms.length, 1)) * 180));
-  const ragTerms = ["rag", "retrieval", "langchain", "vector", "embedding", "faiss", "llm", "genai", "agent"];
-  const dataTerms = ["data", "science", "machine", "learning", "ml", "forecasting", "analytics", "model"];
-  const backendTerms = ["api", "backend", "fastapi", "flask", "sqlite", "postgresql", "typescript", "next"];
-  const nlpTerms = ["nlp", "text", "document", "semantic", "classification", "resume", "retrieval"];
-  const communicationTerms = ["documentation", "case", "study", "explainable", "evidence", "dashboard", "workflow"];
-
-  const allEvidenceText = evidence.map(evidenceText).join(" ");
-  const scoreByTerms = (needles: string[]) => {
-    const matched = needles.filter((term) => allEvidenceText.includes(term));
+  const rubric = buildJobRubric(jdText);
+  const dimensions = rubric.map((criterion) => {
+    const directSources = alignmentEvidence
+      .filter((item) => criterion.aliases.some((alias) => containsPhrase(evidenceText(item), alias)))
+      .filter((item, index, items) => items.findIndex((candidate) => candidate.url === item.url) === index);
+    const related = criterion.related.filter((alias) =>
+      alignmentEvidence.some((item) => containsPhrase(evidenceText(item), alias))
+    );
+    const directSignalCount = criterion.aliases.filter((alias) =>
+      directSources.some((item) => containsPhrase(evidenceText(item), alias))
+    ).length;
+    const sourceQuality = directSources
+      .map((item) =>
+        item.kind === "project" || item.kind === "case-study" ? 4 :
+        item.kind === "experiment" || item.kind === "dashboard" ? 3 :
+        item.kind === "timeline" || item.kind === "cv" || item.kind === "certification" ? 2 :
+        1
+      )
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+      .reduce((sum, value) => sum + value, 0);
+    const hasInspectableEvidence = directSources.some((item) =>
+      ["project", "case-study", "experiment", "dashboard"].includes(item.kind)
+    );
+    const rawDirectScore = 24 + directSignalCount * 10 + sourceQuality * 5;
+    const score = directSources.length
+      ? Math.min(hasInspectableEvidence ? 95 : 58, rawDirectScore)
+      : related.length
+        ? Math.min(38, 18 + related.length * 6)
+        : 0;
+    const matched = [
+      ...criterion.aliases.filter((alias) => directSources.some((item) => containsPhrase(evidenceText(item), alias))),
+      ...related
+    ].slice(0, 6);
     return {
-      score: Math.min(100, Math.round((matched.length / needles.length) * 88)),
-      matched
-    };
-  };
-
-  const buckets = [
-    scoreByTerms(ragTerms),
-    scoreByTerms(dataTerms),
-    scoreByTerms(backendTerms),
-    scoreByTerms(nlpTerms),
-    { score: Math.min(100, evidence.length * 12), matched: evidence.slice(0, 5).map((item) => item.title) },
-    scoreByTerms(communicationTerms),
-    { score: Math.min(82, Math.round(evidenceCoverage * 0.72) + 18), matched: scored.flatMap((item) => item.signals).slice(0, 6) },
-    { score: Math.max(18, 100 - evidenceCoverage), matched: terms.slice(0, 6) }
-  ];
-
-  const dimensions = jobFitDimensionNames.map((name, index) => {
-    const bucket = buckets[index];
-    const score = index === 7 ? Math.min(72, bucket.score) : bucket.score;
-    return {
-      name,
+      name: criterion.name,
+      category: criterion.category,
+      priority: criterion.priority,
+      weight: criterion.weight,
+      evidenceStandard: criterion.evidenceStandard,
       score,
       status: dimensionStatus(score),
-      rationale:
-        index === 7
-          ? "This dimension tracks areas where the public portfolio may not fully prove every JD requirement."
-          : bucket.matched.length
-            ? `Matched portfolio signals include ${bucket.matched.slice(0, 4).join(", ")}.`
-            : "The available public portfolio evidence is limited for this requirement.",
-      matchedSignals: bucket.matched.slice(0, 6)
+      rationale: directSources.length
+        ? `${directSources.length} public evidence source${directSources.length === 1 ? "" : "s"} meet part of this criterion.`
+        : related.length
+          ? `Only adjacent evidence was found: ${related.slice(0, 3).join(", ")}.`
+          : "No direct public portfolio evidence meets this JD criterion.",
+      matchedSignals: matched
     };
   });
 
-  const positiveDimensions = dimensions.slice(0, 7);
-  const overallScore = Math.max(
-    18,
-    Math.min(88, Math.round(positiveDimensions.reduce((sum, item) => sum + item.score, 0) / positiveDimensions.length))
-  );
+  const totalWeight = dimensions.reduce((sum, item) => sum + item.weight, 0);
+  const overallScore = totalWeight
+    ? Math.round(dimensions.reduce((sum, item) => sum + item.score * item.weight, 0) / totalWeight)
+    : 0;
 
   const topEvidence = scored.map(({ item, signals }) => ({
     title: item.section ? `${item.title} - ${item.section}` : item.title,
@@ -385,10 +515,15 @@ export function deterministicJobFit(
     dimensions,
     topEvidence,
     alignmentNotes: buildRequirementAlignment(jdText, alignmentEvidence),
-    gaps: [
-      "Confirm exact production ownership, team size, and business impact for requirements that matter to this JD.",
-      "Validate any domain-specific tools, cloud services, or compliance responsibilities not visible in the public portfolio."
-    ],
+    gaps: (() => {
+      const gaps = dimensions
+        .filter((item) => item.score < 52)
+        .slice(0, 8)
+        .map((item) => `${item.priority} criterion not sufficiently evidenced: ${item.name}`);
+      return gaps.length
+        ? gaps
+        : ["Validate scope, recency, ownership, and outcomes for the strongest matched criteria during interview review."];
+    })(),
     interviewQuestions: [
       "Which portfolio project is closest to this role, and what tradeoffs did you own end to end?",
       "How would you evaluate retrieval quality, model reliability, and user trust for this JD's use case?",

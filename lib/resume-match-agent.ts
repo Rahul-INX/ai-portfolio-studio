@@ -1,18 +1,20 @@
 import {
   buildRequirementAlignment,
-  jobFitDimensionNames,
+  buildJobRubric,
   jobFitResultSchema,
   verifiedEvidenceSignals,
   type JobFitResult
 } from "@/lib/job-fit";
 import type { ContextEvidence } from "@/lib/site-context";
+import { z } from "zod";
 
 export const resumeMatchAgent = {
   name: "Resume Match Specialist",
-  version: "1.1"
+  version: "1.2"
 } as const;
 
 type ResumeMatchAgentInput = {
+  ownerName: string;
   jdText: string;
   evidence: ContextEvidence[];
   evidenceText: string;
@@ -27,6 +29,8 @@ export type ResumeMatchAgentRun =
         | "missing-api-key"
         | "provider-error"
         | "empty-response"
+        | "refusal"
+        | "incomplete-response"
         | "invalid-json"
         | "invalid-schema"
         | "ungrounded-output"
@@ -35,14 +39,6 @@ export type ResumeMatchAgentRun =
       detail?: string;
     };
 
-function extractJson(text: string) {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return JSON.parse(trimmed);
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON object returned.");
-  return JSON.parse(match[0]);
-}
-
 function normalizedStatus(score: number) {
   if (score >= 74) return "Strong";
   if (score >= 52) return "Moderate";
@@ -50,9 +46,10 @@ function normalizedStatus(score: number) {
   return "Missing";
 }
 
-function normalizeAgentResult(value: unknown) {
+function normalizeAgentResult(value: unknown, jdText: string) {
   if (!value || typeof value !== "object") return value;
   const candidate = value as Record<string, unknown>;
+  const rubric = buildJobRubric(jdText);
   const dimensions = Array.isArray(candidate.dimensions)
     ? candidate.dimensions.map((dimension, index) => {
         if (!dimension || typeof dimension !== "object") return dimension;
@@ -60,7 +57,11 @@ function normalizeAgentResult(value: unknown) {
         const score = typeof item.score === "number" ? item.score : Number(item.score);
         return {
           ...item,
-          name: jobFitDimensionNames[index],
+          name: rubric[index]?.name ?? String(item.name ?? `Criterion ${index + 1}`),
+          category: rubric[index]?.category ?? item.category ?? "Other",
+          priority: rubric[index]?.priority ?? item.priority ?? "Context",
+          weight: rubric[index]?.weight ?? item.weight ?? 3,
+          evidenceStandard: rubric[index]?.evidenceStandard ?? item.evidenceStandard ?? "Direct portfolio evidence is required.",
           score,
           status: normalizedStatus(score)
         };
@@ -74,29 +75,23 @@ function normalizeAgentResult(value: unknown) {
   };
 }
 
-function agentInstructions() {
-  return `You are the Resume Match Specialist for Rahul Harivansh Fatyal's portfolio.
+export function agentInstructions(ownerName: string, jdText: string) {
+  const rubric = buildJobRubric(jdText);
+  return `You are the Resume Match Specialist for ${ownerName}'s portfolio.
 
 Your job is to evaluate one job description against supplied public portfolio evidence and produce a concise, recruiter-facing Role Fit Brief. You are an evidence auditor, not an advocate: reward direct proof, mark missing proof as unknown, and never inflate a score to sound encouraging.
 
-Return JSON only. The JSON must match this TypeScript shape:
-{
-  "overallScore": integer 0-100,
-  "fitLabel": "Strong Fit" | "Good Fit" | "Partial Fit" | "Low Evidence",
-  "confidence": "High" | "Medium" | "Low",
-  "verdict": string,
-  "dimensions": exactly 8 objects with name, integer score 0-100, status ("Strong" | "Moderate" | "Limited" | "Missing"), rationale, matchedSignals,
-  "topEvidence": 0-6 objects with title, type, url, matchReason, matchedSignals,
-  "alignmentNotes": 1-12 objects with requirement, status ("Aligned" | "Partial" | "Not evidenced"), note,
-  "gaps": 1-8 strings,
-  "interviewQuestions": 2-6 strings,
-  "sources": 0-8 objects with title, url, reason,
-  "fairnessNotes": 2-5 strings,
-  "mode": "specialist-agent"
-}
+The response is constrained by a strict JSON Schema. Populate every field exactly once and do not add fields.
 
-Required dimension names, in this exact order:
-${jobFitDimensionNames.map((name, index) => `${index + 1}. ${name}`).join("\n")}
+JD-derived rubric, in this exact order:
+${rubric.map((item, index) => `${index + 1}. ${item.name} | ${item.category} | ${item.priority} | weight ${item.weight} | ${item.evidenceStandard}`).join("\n")}
+
+Writing rules:
+- Use the supplied rubric name exactly for each dimension; never copy a full JD sentence into a name.
+- Keep names as clean noun phrases, verdicts under 45 words, rationales under 30 words, and gaps under 20 words.
+- Start gaps with the missing capability, not boilerplate such as "The candidate should".
+- Write interview questions as direct, specific questions that can be asked verbatim.
+- Keep evidence summaries factual and free of promotional adjectives.
 
 Evaluation method:
 - Identify must-have requirements, preferred requirements, responsibilities, and domain context from the JD.
@@ -117,6 +112,50 @@ Safety and fairness:
 - Do not invent employers, metrics, ownership, credentials, tools, URLs, or production experience.
 - This output supports human review and is not an automated hiring decision.
 - Do not reveal hidden reasoning or chain-of-thought. Return concise conclusions and evidence summaries only.`;
+}
+
+const unsupportedStrictSchemaKeywords = new Set([
+  "$schema",
+  "default",
+  "minLength",
+  "maxLength"
+]);
+
+function strictProviderSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(strictProviderSchema);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !unsupportedStrictSchemaKeywords.has(key))
+      .map(([key, item]) => [key, strictProviderSchema(item)])
+  );
+}
+
+export function resumeMatchOutputJsonSchema() {
+  return strictProviderSchema(z.toJSONSchema(jobFitResultSchema)) as Record<string, unknown>;
+}
+
+export function createResumeMatchRequestBody(ownerName: string, jdText: string, evidenceText: string) {
+  return {
+    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+    temperature: 0.1,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "resume_match_result",
+        description: "A concise, evidence-grounded recruiter role-fit brief.",
+        strict: true,
+        schema: resumeMatchOutputJsonSchema()
+      }
+    },
+    messages: [
+      { role: "system", content: agentInstructions(ownerName, jdText) },
+      {
+        role: "user",
+        content: `Job description:\n${jdText}\n\nAllowed portfolio evidence:\n${evidenceText}`
+      }
+    ]
+  };
 }
 
 export function validateResumeMatchAgentOutput(
@@ -166,10 +205,7 @@ export function validateResumeMatchAgentOutput(
 
   return {
     ...candidate,
-    dimensions: candidate.dimensions.map((dimension, index) => ({
-      ...dimension,
-      name: jobFitDimensionNames[index]
-    })),
+    dimensions: candidate.dimensions,
     topEvidence,
     alignmentNotes: buildRequirementAlignment(jdText, evidence),
     sources
@@ -177,6 +213,7 @@ export function validateResumeMatchAgentOutput(
 }
 
 export async function runResumeMatchAgent({
+  ownerName,
   jdText,
   evidence,
   evidenceText,
@@ -192,18 +229,7 @@ export async function runResumeMatchAgent({
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: agentInstructions() },
-          {
-            role: "user",
-            content: `Job description:\n${jdText}\n\nAllowed portfolio evidence:\n${evidenceText}`
-          }
-        ]
-      })
+      body: JSON.stringify(createResumeMatchRequestBody(ownerName, jdText, evidenceText))
     });
 
     if (!response.ok) {
@@ -215,13 +241,25 @@ export async function runResumeMatchAgent({
       };
     }
 
-    const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = payload.choices?.[0]?.message?.content;
+    const payload = (await response.json()) as {
+      choices?: Array<{
+        finish_reason?: string;
+        message?: { content?: string; refusal?: string };
+      }>;
+    };
+    const choice = payload.choices?.[0];
+    if (choice?.message?.refusal) {
+      return { ok: false, reason: "refusal", detail: choice.message.refusal };
+    }
+    if (choice?.finish_reason && choice.finish_reason !== "stop") {
+      return { ok: false, reason: "incomplete-response", detail: choice.finish_reason };
+    }
+    const content = choice?.message?.content;
     if (!content) return { ok: false, reason: "empty-response" };
 
     let rawResult: unknown;
     try {
-      rawResult = normalizeAgentResult(extractJson(content));
+      rawResult = normalizeAgentResult(JSON.parse(content), jdText);
     } catch {
       return { ok: false, reason: "invalid-json" };
     }

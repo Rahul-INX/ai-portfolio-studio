@@ -1,12 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Database, Mail, MapPin, Phone, SearchCheck, ShieldCheck } from "lucide-react";
+import { Mail } from "lucide-react";
 import { ContentCard } from "@/components/card";
 import { KnowledgeGraph } from "@/components/knowledge-graph";
 import { MotionPanel } from "@/components/motion-panel";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
+import { EditableHero } from "@/components/editable-hero";
 import { getExplorerItems, getProjects, getSiteProfile, getSkills } from "@/lib/content";
 
 export default async function HomePage() {
@@ -34,86 +35,30 @@ export default async function HomePage() {
   return (
     <SiteShell profile={profile}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <section
-        id="overview"
-        className="quiet-grid relative overflow-hidden border-b hairline bg-[color-mix(in_srgb,var(--background),transparent_10%)]"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_76%_44%,color-mix(in_srgb,var(--accent-soft),transparent_80%),transparent_24rem)]" />
-        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 items-center gap-10 px-4 pb-12 pt-10 sm:px-6 lg:min-h-[calc(100dvh-8.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)] lg:px-8 lg:py-12 xl:gap-16">
-          <MotionPanel>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-              {profile.heroEyebrow}
-            </p>
-            <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-normal text-[var(--foreground)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.08] xl:text-6xl">
-              {profile.heroTitle}
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
-              {profile.heroSummary}
-            </p>
-            <div className="mt-7 hidden gap-2 sm:grid sm:grid-cols-3">
-              {[
-                { icon: Database, label: profile.focusLabel, value: profile.focusValue },
-                { icon: ShieldCheck, label: profile.styleLabel, value: profile.styleValue },
-                { icon: BarChart3, label: profile.modelLabel, value: profile.modelValue }
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-md border hairline bg-[color-mix(in_srgb,var(--panel-strong),transparent_16%)] p-3.5 backdrop-blur-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <item.icon aria-hidden className="h-4 w-4 shrink-0 text-cobalt-500" />
-                    <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{item.label}</p>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold leading-5">{item.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/explorer"
-                className="inline-flex h-11 items-center gap-2 rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
-              >
-                {profile.primaryCtaLabel} <ArrowRight aria-hidden className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/timeline"
-                className="inline-flex h-11 items-center rounded-md border hairline px-5 text-sm font-medium transition hover:border-cobalt-500"
-              >
-                {profile.secondaryCtaLabel}
-              </Link>
-              <Link
-                href="/job-fit"
-                className="inline-flex h-11 items-center gap-2 rounded-md border hairline px-5 text-sm font-medium transition hover:border-cobalt-500"
-              >
-                Check Job Fit <SearchCheck aria-hidden className="h-4 w-4" />
-              </Link>
-            </div>
-          </MotionPanel>
+      <section id="overview" className="relative overflow-hidden border-b hairline">
+        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:px-8 lg:py-20 xl:gap-20">
+          <MotionPanel><EditableHero profile={profile} /></MotionPanel>
 
-          <MotionPanel
-            delay={0.08}
-            className="surface relative mx-auto w-full max-w-sm overflow-hidden rounded-lg p-0 lg:mx-0 lg:justify-self-end"
-          >
-            <span className="pointer-events-none absolute right-3 top-3 z-10 rounded-full border border-white/20 bg-black/35 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-white/80 backdrop-blur-md">
-              Portfolio / 2026
-            </span>
-            <div className="relative aspect-[4/5] border-b hairline bg-[color-mix(in_srgb,var(--panel-strong),var(--accent-soft)_10%)]">
-              <Image
-                src={profile.profileImageUrl || "/media/rahul-profile.jpeg"}
-                alt={`${profile.name} portrait`}
-                fill
-                priority
-                sizes="(min-width: 1024px) 24rem, (min-width: 640px) 24rem, calc(100vw - 2rem)"
-                className="object-cover"
-              />
+          <MotionPanel delay={0.08} className="lg:pt-8">
+            <div className="relative mx-auto aspect-[4/5] w-full max-w-[15rem] overflow-hidden rounded-xl bg-[var(--panel-strong)] lg:mx-0 lg:ml-auto">
+              {profile.profileImageUrl ? (
+                <Image
+                  src={profile.profileImageUrl}
+                  alt={`${profile.name} portrait`}
+                  fill
+                  priority
+                  sizes="15rem"
+                  className="object-cover grayscale-[18%]"
+                />
+              ) : (
+                <div className="grid h-full place-items-center text-5xl font-semibold text-[var(--accent)]">{profile.initials}</div>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-4 bg-[var(--panel-strong)] px-5 py-4">
-              <div className="min-w-0">
-                <p className="truncate text-lg font-semibold tracking-normal">{profile.name}</p>
-                <p className="mt-0.5 text-sm text-[var(--muted)]">{profile.role}</p>
-              </div>
+            <div className="mt-5 border-t hairline pt-4">
+              <p className="font-semibold">{profile.name}</p>
+              <p className="mt-1 text-sm leading-5 text-[var(--muted)]">{profile.contactLocation}</p>
               {profile.githubUrl || profile.linkedinUrl ? (
-                <div className="flex shrink-0 gap-1">
+                <div className="mt-3 flex gap-1">
                   {profile.githubUrl ? (
                     <a
                       href={profile.githubUrl}
@@ -140,58 +85,24 @@ export default async function HomePage() {
                   ) : null}
                 </div>
               ) : null}
+              <a href={`mailto:${profile.contactEmail}`} className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+                <Mail aria-hidden className="h-4 w-4" /> Start a conversation
+              </a>
             </div>
           </MotionPanel>
         </div>
       </section>
 
-      <section className="bg-[color-mix(in_srgb,var(--panel),transparent_28%)]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+      <section className="border-b hairline bg-[var(--panel)]">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[0.34fr_1fr] lg:px-8">
+          <p className="eyebrow">Latest evidence</p>
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">Get in touch</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-              {profile.contactLocation ? (
-                <div className="flex min-w-0 items-start gap-3">
-                  <MapPin aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cobalt-500" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-[var(--muted)]">Location</p>
-                    <p className="mt-0.5 truncate text-sm font-medium">{profile.contactLocation}</p>
-                  </div>
-                </div>
-              ) : null}
-              {profile.contactEmail ? (
-                <a href={`mailto:${profile.contactEmail}`} className="flex min-w-0 items-start gap-3 transition hover:text-cobalt-500">
-                  <Mail aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cobalt-500" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-[var(--muted)]">Email</p>
-                    <p className="mt-0.5 truncate text-sm font-medium">{profile.contactEmail}</p>
-                  </div>
-                </a>
-              ) : null}
-              {profile.contactPhone ? (
-                <a
-                  href={`tel:${profile.contactPhone.replace(/[^\d+]/g, "")}`}
-                  className="flex min-w-0 items-start gap-3 transition hover:text-cobalt-500"
-                >
-                  <Phone aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cobalt-500" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-[var(--muted)]">Phone</p>
-                    <p className="mt-0.5 truncate text-sm font-medium">{profile.contactPhone}</p>
-                  </div>
-                </a>
-              ) : null}
-            </div>
-          </div>
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-              Recent Activity
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-px overflow-hidden rounded-lg border hairline bg-[var(--line)] sm:grid-cols-2">
               {recent.map((item) => (
                 <Link
                   key={`${item.kind}-${item.slug}`}
                   href={`/${item.kind}/${item.slug}`}
-                  className="rounded-md border border-transparent p-3 transition hover:border-[var(--line)] hover:bg-[color-mix(in_srgb,var(--accent-soft),transparent_84%)]"
+                  className="bg-[var(--panel-strong)] p-4 transition hover:bg-[color-mix(in_srgb,var(--accent),transparent_92%)]"
                 >
                   <p className="text-sm font-medium">{item.title}</p>
                   <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">{item.kind}</p>
@@ -202,12 +113,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-y hairline">
-        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section className="border-b hairline">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
           <SectionHeading
             eyebrow="Selected Systems"
-            title="Portfolio-safe abstractions of production AI engineering work."
-            description="The examples focus on system patterns, tradeoffs, and engineering judgment while avoiding private architecture, client data, or proprietary implementation details."
+            title="Systems with inspectable architecture, outcomes, and operating constraints."
+            description="Systems Explorer prioritizes credible proof: the problem, the implementation boundary, measurable signals, and the decisions that make each system reviewable."
           />
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
             {featured.map((item) => (
@@ -217,7 +128,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
         <KnowledgeGraph skills={skills} />
       </section>
     </SiteShell>

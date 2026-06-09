@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildRequirementAlignment,
+  buildJobRubric,
   deterministicJobFit,
-  jobFitDimensionNames,
+  jobFitResultSchema,
   selectRelevantJobEvidence,
   verifiedEvidenceSignals
 } from "@/lib/job-fit";
-import { validateResumeMatchAgentOutput } from "@/lib/resume-match-agent";
+import {
+  agentInstructions,
+  createResumeMatchRequestBody,
+  resumeMatchOutputJsonSchema,
+  runResumeMatchAgent,
+  validateResumeMatchAgentOutput
+} from "@/lib/resume-match-agent";
 import { gatherAllPortfolioEvidence, type ContextEvidence } from "@/lib/site-context";
 
 const evidence: ContextEvidence[] = [
@@ -34,13 +41,71 @@ const fallback = deterministicJobFit(
 function validAgentResult() {
   return {
     ...fallback,
-    mode: "specialist-agent" as const,
-    dimensions: fallback.dimensions.map((dimension, index) => ({
-      ...dimension,
-      name: jobFitDimensionNames[index]
-    }))
+    mode: "specialist-agent" as const
   };
 }
+
+test("derives a weighted rubric from the uploaded JD instead of fixed portfolio domains", () => {
+  const rubric = buildJobRubric([
+    "The candidate must build Java Spring services and own production reliability.",
+    "Kubernetes experience is required.",
+    "Retail payments knowledge is preferred."
+  ].join("\n"));
+
+  assert.ok(rubric.some((item) => /kubernetes|containers/i.test(item.name)));
+  assert.ok(rubric.some((item) => item.priority === "Must have" && item.weight === 5));
+  assert.ok(rubric.some((item) => item.priority === "Preferred"));
+  assert.ok(rubric.every((item) => item.evidenceStandard.length > 8));
+  assert.ok(rubric.every((item) => !/GenAI \/ RAG alignment/i.test(item.name)));
+});
+
+test("normalizes prose responsibilities into concise capability labels", () => {
+  const rubric = buildJobRubric(
+    "You will design, build, test, and maintain software that directly impacts users and business outcomes."
+  );
+
+  assert.ok(rubric.some((item) => item.name === "Software delivery and business impact"));
+  assert.ok(rubric.every((item) => !/^you will/i.test(item.name)));
+  assert.ok(rubric.every((item) => item.name.length <= 60));
+});
+
+test("builds a strict native structured-output request from the Zod contract", () => {
+  const request = createResumeMatchRequestBody(
+    "Rahul",
+    "You will design, build, test, and maintain software that directly impacts users and business outcomes.",
+    "Allowed evidence"
+  );
+  const responseFormat = request.response_format;
+  const serializedSchema = JSON.stringify(responseFormat.json_schema.schema);
+
+  assert.equal(responseFormat.type, "json_schema");
+  assert.equal(responseFormat.json_schema.strict, true);
+  assert.equal(responseFormat.json_schema.name, "resume_match_result");
+  assert.match(serializedSchema, /overallScore/);
+  assert.match(serializedSchema, /dimensions/);
+  assert.doesNotMatch(serializedSchema, /"\$schema"|"default"|"minLength"|"maxLength"/);
+});
+
+test("structured-output prompt requires concise noun-phrase labels", () => {
+  const instructions = agentInstructions(
+    "Rahul",
+    "You will design, build, test, and maintain software that directly impacts users and business outcomes."
+  );
+
+  assert.match(instructions, /never copy a full JD sentence into a name/i);
+  assert.match(instructions, /clean noun phrases/i);
+  assert.match(instructions, /Software delivery and business impact/);
+});
+
+test("generated provider schema still validates the complete result contract", () => {
+  const schema = resumeMatchOutputJsonSchema();
+  assert.equal(schema.type, "object");
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(
+    (schema.required as string[]).sort(),
+    Object.keys(jobFitResultSchema.shape).sort()
+  );
+});
 
 test("accepts a schema-valid agent result grounded in allowed evidence URLs", () => {
   const result = validateResumeMatchAgentOutput(
@@ -54,6 +119,30 @@ test("accepts a schema-valid agent result grounded in allowed evidence URLs", ()
   assert.equal(result?.sources[0].title, "Resume Matcher - Architecture");
   assert.deepEqual(result?.topEvidence[0].matchedSignals, ["evidence", "fastapi", "python", "retrieval", "scoring"]);
   assert.match(result?.topEvidence[0].matchReason ?? "", /verified JD signals/i);
+});
+
+test("handles a native structured-output refusal without parsing it as JSON", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  const originalFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  global.fetch = async () => new Response(JSON.stringify({
+    choices: [{ finish_reason: "stop", message: { refusal: "Cannot evaluate this request." } }]
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  try {
+    const result = await runResumeMatchAgent({
+      ownerName: "Rahul",
+      jdText: "Python FastAPI retrieval evidence scoring role with production responsibilities",
+      evidence,
+      evidenceText: "Python FastAPI retrieval evidence scoring.",
+      timeoutMs: 1_000
+    });
+    assert.deepEqual(result, { ok: false, reason: "refusal", detail: "Cannot evaluate this request." });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
+  }
 });
 
 test("rejects an agent result containing an invented citation URL", () => {

@@ -31,6 +31,9 @@ const projectSchema = baseSchema.extend({
   status: z.enum(["PLANNED", "ACTIVE", "COMPLETED", "MAINTAINED"]).default("ACTIVE"),
   techStack: z.array(z.string()).default([]),
   businessImpact: z.string().min(10),
+  githubUrl: z.string().url().optional().or(z.literal("")),
+  demoUrl: z.string().url().optional().or(z.literal("")),
+  featured: z.boolean().default(false),
   imageUrl: optionalImageSchema,
   startDate: z.string().optional().or(z.literal("")),
   endDate: z.string().optional().or(z.literal("")),
@@ -202,11 +205,13 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.kind === "project") {
-    const { kind: _kind, imageUrl, startDate, endDate, ...data } = parsed.data;
+    const { kind: _kind, imageUrl, startDate, endDate, githubUrl, demoUrl, ...data } = parsed.data;
     void _kind;
     const published = {
       ...data,
       imageUrl: imageUrl || null,
+      githubUrl: githubUrl || null,
+      demoUrl: demoUrl || null,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       visibility: "PUBLISHED" as const,

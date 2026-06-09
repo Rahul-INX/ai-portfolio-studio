@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { getSiteProfile } from "@/lib/content";
 import "./globals.css";
 
 export const revalidate = 300;
@@ -17,24 +18,21 @@ const geistMono = Geist_Mono({
   display: "swap"
 });
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const profile = await getSiteProfile();
+  return {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3000"),
-  title: {
-    default: "Rahul Harivansh Fatyal | Senior AI Engineer",
-    template: "%s | Rahul Harivansh Fatyal"
-  },
-  description:
-    "A premium AI engineering portfolio and knowledge hub focused on RAG, MLOps, structured extraction, analytics, and trustworthy AI systems.",
+  title: { default: profile.seoTitle, template: `%s | ${profile.name}` },
+  description: profile.seoDescription,
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icon.svg"
   },
   openGraph: {
-    title: "Rahul Harivansh Fatyal | Senior AI Engineer",
-    description:
-      "Portfolio and knowledge hub for production-grade AI engineering, data science, and evaluation systems.",
+    title: profile.seoTitle,
+    description: profile.seoDescription,
     url: "/",
-    siteName: "Rahul Harivansh Fatyal",
+    siteName: profile.name,
     type: "website",
     images: [
       {
@@ -47,11 +45,12 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rahul Harivansh Fatyal | Senior AI Engineer",
-    description: "AI engineering portfolio, case studies, experiments, and technical writing.",
+    title: profile.seoTitle,
+    description: profile.seoDescription,
     images: ["/media/ai-systems-hero.png"]
   }
-};
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

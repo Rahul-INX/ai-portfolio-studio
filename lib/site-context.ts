@@ -12,7 +12,6 @@ import {
 } from "@/lib/content";
 import { citationLink, contentKindLabel, sectionRouteForTarget } from "@/lib/citations";
 import type { CitationTarget } from "@/lib/citations";
-import { cvPlainText, cvSections } from "@/lib/cv-content";
 import {
   safeBlogs,
   safeCaseStudies,
@@ -286,64 +285,64 @@ export async function buildSiteContextItems(useSafeContent = false): Promise<Sit
     contextItem({
       id: "cv:summary",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Summary",
-      summary: cvSections.summary.body,
-      body: cvPlainText(),
+      summary: profile.seoDescription,
+      body: `${profile.heroSummary}\n${projects.map((item) => `${item.title}: ${item.summary} ${item.businessImpact}`).join("\n")}`,
       tags: ["CV", "Resume", "Profile", "Skills", "Projects", "Career"]
     }),
     contextItem({
       id: "cv:skills",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Skills",
       summary: "Technical and professional skills across GenAI, data science, engineering, and leadership.",
-      body: cvSections.skills.join("\n"),
+      body: skills.map((item) => `${item.name}: ${item.category}`).join("\n"),
       tags: ["CV", "Skills", "GenAI", "Data Science", "Engineering"]
     }),
     contextItem({
       id: "cv:projects",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Projects",
       summary: "Selected project evidence for RAG, document intelligence, resume matching, tutoring, ML, and NLP.",
-      body: cvSections.projects.map((item) => `${item.title}: ${item.body}`).join("\n"),
+      body: projects.map((item) => `${item.title}: ${item.summary} ${item.businessImpact}`).join("\n"),
       tags: ["CV", "Projects", "RAG", "Resume", "NLP"]
     }),
     contextItem({
       id: "cv:experience",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Experience",
       summary: "Experience signals across web development, entrepreneurship coordination, and NCC leadership.",
-      body: cvSections.experience.map((item) => `${item.title}: ${item.body}`).join("\n"),
+      body: timeline.map((item) => `${item.period} ${item.title}: ${item.description}`).join("\n"),
       tags: ["CV", "Experience", "Leadership"]
     }),
     contextItem({
       id: "cv:education",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Education",
-      summary: "Education details for computer science, higher secondary, and secondary school.",
-      body: cvSections.education.join("\n"),
-      tags: ["CV", "Education"]
+      summary: "Education and foundation evidence represented in the editable timeline.",
+      body: timeline.filter((item) => /education|foundation|school|college|university/i.test(`${item.title} ${item.description}`)).map((item) => `${item.period}: ${item.title}. ${item.description}`).join("\n"),
+      tags: ["CV", "Education", "Timeline"]
     }),
     contextItem({
       id: "cv:certifications",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Certifications",
       summary: "Certification signals across machine learning, Python, analytics, AWS, and English communication.",
-      body: cvSections.certifications.join("\n"),
+      body: certifications.map((item) => `${item.title}: ${item.issuer}`).join("\n"),
       tags: ["CV", "Certifications", "Machine Learning", "Python", "AWS"]
     }),
     contextItem({
       id: "cv:leadership",
       kind: "cv" as const,
-      title: "Rahul Harivansh Fatyal CV",
+      title: `${profile.name} CV`,
       section: "Leadership",
       summary: "Leadership and interest signals from NCC, entrepreneurship coordination, volunteering, and technical curiosity.",
-      body: cvSections.leadership.join("\n"),
+      body: timeline.filter((item) => /lead|mentor|coordinat|team|manage/i.test(`${item.title} ${item.description}`)).map((item) => `${item.title}: ${item.description}`).join("\n"),
       tags: ["CV", "Leadership", "NCC", "Entrepreneurship"]
     })
   ];

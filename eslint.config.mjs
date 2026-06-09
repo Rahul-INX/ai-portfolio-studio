@@ -5,7 +5,7 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
-    ignores: [".next/**", "node_modules/**", "prisma/generated/**", "next-env.d.ts"]
+    ignores: [".next/**", ".next-stale-*/**", "node_modules/**", "prisma/generated/**", "next-env.d.ts"]
   }
 ];
 

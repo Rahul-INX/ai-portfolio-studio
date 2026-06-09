@@ -1,7 +1,8 @@
 import { buildSiteContextItems } from "@/lib/site-context";
+import { getSiteProfile } from "@/lib/content";
 
 export async function GET() {
-  const items = await buildSiteContextItems();
+  const [items, siteProfile] = await Promise.all([buildSiteContextItems(), getSiteProfile()]);
   const profile = items.find((item) => item.kind === "profile");
   const groups = [
     ["Core AI Projects", items.filter((item) => item.kind === "project")],
@@ -14,7 +15,7 @@ export async function GET() {
   ] as const;
 
   const lines = [
-    "# Rahul Harivansh Fatyal",
+    `# ${siteProfile.name}`,
     "",
     `> ${profile?.summary ?? "GenAI and data science portfolio with cited section links."}`,
     "",

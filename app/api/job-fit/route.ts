@@ -3,6 +3,7 @@ import { buildRequirementAlignment, deterministicJobFit, selectRelevantJobEviden
 import { getJobFitSettings } from "@/lib/job-fit-settings";
 import { runResumeMatchAgent } from "@/lib/resume-match-agent";
 import { evidenceBlock, gatherAllPortfolioEvidence } from "@/lib/site-context";
+import { getSiteProfile } from "@/lib/content";
 
 export const runtime = "nodejs";
 
@@ -88,9 +89,10 @@ export async function POST(request: Request) {
     return responseError(`Keep the job description under ${maxJdChars.toLocaleString()} characters.`);
   }
 
-  const [siteEvidence, settings] = await Promise.all([
+  const [siteEvidence, settings, profile] = await Promise.all([
     gatherAllPortfolioEvidence(jdText),
-    getJobFitSettings()
+    getJobFitSettings(),
+    getSiteProfile()
   ]);
   const evidence = selectRelevantJobEvidence(jdText, siteEvidence);
   const alignmentNotes = buildRequirementAlignment(jdText, siteEvidence);
@@ -100,6 +102,7 @@ export async function POST(request: Request) {
   }
 
   const agentRun = await runResumeMatchAgent({
+    ownerName: profile.name,
     jdText,
     evidence,
     evidenceText: evidenceBlock(evidence),

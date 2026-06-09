@@ -23,7 +23,7 @@ export default async function JobFitPage() {
             Role Fit Brief
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
-            Paste or attach a job description to compare the role against Rahul&apos;s public portfolio evidence. The output keeps a fixed dashboard structure, names gaps clearly, and avoids unverifiable claims.
+            Paste or attach any job description to compare the role against {profile.name}&apos;s public portfolio evidence. The evaluator derives a rubric from that JD, names missing proof clearly, and avoids unverifiable claims.
           </p>
         </div>
         <div className="mt-8">

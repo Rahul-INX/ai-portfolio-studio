@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
+import { getSiteProfile } from "@/lib/content";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const profile = await getSiteProfile();
   return {
-    name: "Rahul Harivansh Fatyal Portfolio",
-    short_name: "Rahul AI",
-    description: "Senior AI Engineer portfolio and knowledge hub.",
+    name: `${profile.name} Portfolio`,
+    short_name: profile.initials,
+    description: profile.seoDescription,
     start_url: "/",
     display: "standalone",
     background_color: "#090d0b",

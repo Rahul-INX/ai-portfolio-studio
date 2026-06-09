@@ -3,13 +3,9 @@ import Link from "next/link";
 import { Download, FileText } from "lucide-react";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
-import { cvSections } from "@/lib/cv-content";
-import { getPortfolioDocuments, getSiteProfile } from "@/lib/content";
+import { getCertifications, getPortfolioDocuments, getProjects, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
 
-export const metadata: Metadata = {
-  title: "CV | Rahul Harivansh Fatyal",
-  description: "Detailed CV for Rahul Harivansh Fatyal covering GenAI, RAG, data science, projects, education, leadership, and certifications."
-};
+export const metadata: Metadata = { title: "Detailed CV", description: "Detailed public portfolio CV with projects, skills, experience, and certifications." };
 
 function SectionShell({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -21,7 +17,9 @@ function SectionShell({ id, title, children }: { id: string; title: string; chil
 }
 
 export default async function CvPage() {
-  const [profile, documents] = await Promise.all([getSiteProfile(), getPortfolioDocuments()]);
+  const [profile, documents, skills, projects, timeline, certifications] = await Promise.all([
+    getSiteProfile(), getPortfolioDocuments(), getSkills(), getProjects(), getTimeline(), getCertifications()
+  ]);
   const resume = documents.find((item) => item.kind === "RESUME");
   const cv = documents.find((item) => item.kind === "CV");
 
@@ -30,8 +28,8 @@ export default async function CvPage() {
       <article className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Detailed CV"
-          title="Rahul Harivansh Fatyal"
-          description="A public-safe CV focused on GenAI systems, retrieval workflows, data science, software delivery, leadership, education, and certifications."
+          title={profile.name}
+          description={profile.heroSummary}
         />
         <div className="mt-8 flex flex-wrap gap-3">
           {cv ? (
@@ -61,15 +59,15 @@ export default async function CvPage() {
         </div>
 
         <div className="mt-10 grid gap-5">
-          <SectionShell id="summary" title={cvSections.summary.title}>
-            <p className="leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_24%)]">{cvSections.summary.body}</p>
+          <SectionShell id="summary" title="Professional Summary">
+            <p className="leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_24%)]">{profile.seoDescription}</p>
           </SectionShell>
 
           <SectionShell id="skills" title="Skills">
             <div className="grid gap-3 sm:grid-cols-2">
-              {cvSections.skills.map((skill) => (
-                <div key={skill} className="rounded-md border hairline p-3 text-sm leading-6 text-[var(--muted)]">
-                  {skill}
+              {skills.map((skill) => (
+                <div key={skill.name} className="rounded-md border hairline p-3 text-sm leading-6 text-[var(--muted)]">
+                  <strong className="text-[var(--foreground)]">{skill.name}</strong> · {skill.category}
                 </div>
               ))}
             </div>
@@ -77,10 +75,11 @@ export default async function CvPage() {
 
           <SectionShell id="projects" title="Selected Projects">
             <div className="space-y-4">
-              {cvSections.projects.map((project) => (
+              {projects.map((project) => (
                 <article key={project.title} className="rounded-md border hairline p-4">
                   <h3 className="font-semibold">{project.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{project.body}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{project.summary}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{project.businessImpact}</p>
                 </article>
               ))}
             </div>
@@ -88,40 +87,27 @@ export default async function CvPage() {
 
           <SectionShell id="experience" title="Experience">
             <div className="space-y-4">
-              {cvSections.experience.map((item) => (
+              {timeline.map((item) => (
                 <article key={item.title}>
-                  <h3 className="font-semibold">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.body}</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="font-semibold">{item.title}</h3><span className="text-xs text-[var(--muted)]">{item.period}</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.description}</p>
                 </article>
               ))}
             </div>
           </SectionShell>
 
-          <SectionShell id="education" title="Education">
-            <ul className="space-y-3 text-sm leading-6 text-[var(--muted)]">
-              {cvSections.education.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </SectionShell>
-
           <SectionShell id="certifications" title="Certifications">
             <div className="grid gap-3 sm:grid-cols-2">
-              {cvSections.certifications.map((item) => (
-                <div key={item} className="rounded-md border hairline p-3 text-sm text-[var(--muted)]">
-                  {item}
+              {certifications.map((item) => (
+                <div key={`${item.title}-${item.issuer}`} className="rounded-md border hairline p-3 text-sm text-[var(--muted)]">
+                  <strong className="text-[var(--foreground)]">{item.title}</strong><br />{item.issuer}
                 </div>
               ))}
             </div>
           </SectionShell>
 
-          <SectionShell id="leadership" title="Leadership And Interests">
-            <ul className="space-y-3 text-sm leading-6 text-[var(--muted)]">
-              {cvSections.leadership.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </SectionShell>
         </div>
       </article>
     </SiteShell>

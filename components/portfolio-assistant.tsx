@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Bot, RotateCcw, Send, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
-const prompts = [
-  "What are Rahul's strongest GenAI projects?",
+const basePrompts = [
+  "What are the strongest projects in this portfolio?",
   "Explain the RAG experience in this portfolio.",
   "What data science evidence should a recruiter notice?"
 ];
@@ -14,12 +14,6 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-};
-
-const welcomeMessage: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content: "Hi! I'm Rahul's Portfolio Copilot. Ask me about his GenAI projects, RAG systems, data science work, or technical story."
 };
 
 const chatStorageKey = "portfolio-assistant-messages";
@@ -123,7 +117,12 @@ function getHighestMessageId(messages: ChatMessage[]) {
   }, 0);
 }
 
-export function PortfolioAssistant() {
+export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
+  const welcomeMessage: ChatMessage = {
+    id: "welcome",
+    role: "assistant",
+    content: `Hi! I'm ${ownerName}'s Portfolio Copilot. Ask me about projects, skills, experience, or technical evidence.`
+  };
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -256,7 +255,7 @@ export function PortfolioAssistant() {
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
                 Portfolio Copilot
               </p>
-              <h2 className="mt-1 text-base font-semibold tracking-normal">Ask Rahul&apos;s portfolio</h2>
+              <h2 className="mt-1 text-base font-semibold tracking-normal">Ask {ownerName}&apos;s portfolio</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -336,7 +335,7 @@ export function PortfolioAssistant() {
               <p className="text-[10px] uppercase tracking-wider text-sage-500 font-semibold mb-1">
                 Suggested Questions
               </p>
-              {prompts.map((prompt) => (
+              {basePrompts.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
@@ -351,7 +350,7 @@ export function PortfolioAssistant() {
                 onClick={() => setOpen(false)}
                 className="rounded-md border hairline bg-ink-900 px-3 py-2 text-left text-xs font-medium text-white transition hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
               >
-                Check Rahul against a JD
+                Check this portfolio against a JD
               </Link>
             </div>
           )}

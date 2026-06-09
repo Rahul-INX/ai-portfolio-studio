@@ -15,7 +15,7 @@ const aiReadablePaths = ["/llms.txt", "/llms-full.txt"];
 export function affectedContentPaths(kind: EditableContentKind, slug?: string) {
   const paths =
     kind === "site-profile"
-      ? ["/", "/explorer", "/timeline"]
+      ? ["/", "/explorer", "/timeline", "/cv", "/job-fit", "/manifest.webmanifest", "/opengraph-image"]
       : kind === "project"
         ? ["/", "/explorer", slug ? `/project/${slug}` : undefined]
         : kind === "case-study"

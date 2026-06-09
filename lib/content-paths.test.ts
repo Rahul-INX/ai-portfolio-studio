@@ -7,6 +7,10 @@ test("profile edits invalidate every public profile consumer", () => {
     "/",
     "/explorer",
     "/timeline",
+    "/cv",
+    "/job-fit",
+    "/manifest.webmanifest",
+    "/opengraph-image",
     "/llms.txt",
     "/llms-full.txt"
   ]);

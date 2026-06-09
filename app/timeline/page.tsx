@@ -4,6 +4,7 @@ import { Download, FileText } from "lucide-react";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { getCertifications, getPortfolioDocuments, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
+import { ContextualEditLink } from "@/components/contextual-edit-link";
 
 export const metadata: Metadata = {
   title: "Resume and Timeline",
@@ -96,23 +97,24 @@ export default async function TimelinePage() {
               </div>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="relative space-y-6 before:absolute before:bottom-4 before:left-[0.45rem] before:top-4 before:w-px before:bg-[var(--line-strong)]">
             {timeline.map((item) => (
               <article
                 id={`timeline-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`}
                 key={item.title}
-                className="surface scroll-mt-24 rounded-lg p-5"
+                className="surface relative ml-8 scroll-mt-24 rounded-2xl p-5 before:absolute before:-left-[2.05rem] before:top-7 before:h-4 before:w-4 before:rounded-full before:border-4 before:border-[var(--background)] before:bg-[var(--accent)]"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-mono text-xs uppercase tracking-[0.16em] text-sage-700 dark:text-sage-300">
                       {item.period}
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold">{item.title}</h2>
+                    <h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{item.title}</h2>
                   </div>
                   <span className="rounded-md border hairline px-3 py-1 text-sm text-[var(--muted)]">
                     {item.signal}
                   </span>
+                  <ContextualEditLink kind="timeline" record={item.title} label={item.title} />
                 </div>
                 <p className="mt-4 leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
                   {item.description}

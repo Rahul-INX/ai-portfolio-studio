@@ -11,8 +11,7 @@ test.describe("portfolio platform", () => {
     await expect(page.getByRole("heading", { name: /building retrieval, automation, and data products/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /explore ai systems/i })).toBeVisible();
     await expect(page.getByAltText(/rahul harivansh fatyal portrait/i).first()).toBeVisible();
-    await expect(page.getByText(/bilaspur, himachal pradesh, india/i).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /rahulharivanshfatyal@gmail\.com/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /start a conversation/i })).toHaveAttribute("href", /^mailto:.+@.+$/);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -45,7 +44,7 @@ test.describe("portfolio platform", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("job fit generates a fixed recruiter dashboard from pasted JD text", async ({ page }) => {
+  test("job fit generates a JD-derived recruiter rubric from pasted JD text", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /check job fit/i }).first().click();
     await expect(page).toHaveURL(/\/job-fit/);
@@ -59,16 +58,21 @@ test.describe("portfolio platform", () => {
     await page.getByRole("button", { name: /generate fit brief/i }).click();
 
     await expect(page.getByText(/building the role fit brief/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /evidence dashboard/i })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/overall fit/i)).toBeVisible();
-    await expect(page.getByText(/genai \/ rag alignment/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /points to note/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /what aligns/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /what needs validation/i })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: /fit brief sections/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/decision/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /the criteria most likely to change the hiring decision/i })).toBeVisible();
+    await expect(page.getByText("Priority", { exact: true })).toBeVisible();
+    await expect(page.getByText("Evidence", { exact: true }).last()).toBeVisible();
+    await expect(page.getByText(/proven strengths/i)).toBeVisible();
+    await expect(page.getByText(/decision risks/i)).toBeVisible();
+    await expect(page.getByText(/recommended next step/i)).toBeVisible();
+    await page.getByRole("button", { name: /^evidence/i }).click();
+    await expect(page.getByRole("heading", { name: /evidence dashboard/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /open evidence source/i }).first()).toContainText(/view citation/i);
+    await page.getByRole("button", { name: /^interview/i }).click();
     await expect(page.getByRole("heading", { name: /gap analysis/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /interview probes/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /unbiased notes/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /open evidence source/i }).first()).toContainText(/view citation/i);
     await expect(page.getByRole("heading", { name: /analyzed job description/i })).toBeVisible();
     await expect(page.getByLabel(/paste jd text/i)).toBeHidden();
     await page.getByRole("button", { name: /edit jd/i }).click();
@@ -78,11 +82,13 @@ test.describe("portfolio platform", () => {
 
   test("job fit rejects unsupported JD files", async ({ page }) => {
     await page.goto("/job-fit");
+    await page.waitForLoadState("networkidle");
     await page.getByLabel(/attach jd file/i).setInputFiles({
       name: "jd.csv",
       mimeType: "text/csv",
       buffer: Buffer.from("role,skill\nGenAI,LangChain")
     });
+    await expect(page.getByText("jd.csv")).toBeVisible();
     await page.getByRole("button", { name: /generate fit brief/i }).click();
     await expect(page.getByText(/attach a \.txt, \.pdf, or \.docx job description file/i)).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -135,8 +141,11 @@ test.describe("portfolio platform", () => {
   test("theme toggle and keyboard focus are available", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("theme", "light"));
     await page.goto("/");
-    await page.keyboard.press("Tab");
-    await expect(page.getByText(/skip to content/i)).toBeFocused();
+    const skipLink = page.getByRole("link", { name: /skip to content/i });
+    await skipLink.focus();
+    await expect(skipLink).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#main$/);
     await page.getByRole("button", { name: /toggle light and dark theme/i }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
   });
