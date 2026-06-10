@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { affectedContentPaths, type EditableContentKind } from "@/lib/content-paths";
 import { getExplorerItems } from "@/lib/content";
+import { safeSiteProfile } from "@/lib/safe-content";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -173,9 +174,6 @@ const siteProfileSchema = z.object({
   timelineEyebrow: z.string().min(3),
   timelineTitle: z.string().min(10),
   timelineDescription: z.string().min(20),
-  awardsEyebrow: z.string().min(3),
-  awardsTitle: z.string().min(10),
-  awardsDescription: z.string().min(20),
   adminEyebrow: z.string().min(3),
   adminTitle: z.string().min(10),
   adminDescription: z.string().min(20),
@@ -412,6 +410,7 @@ async function publishContent(request: Request) {
     } = parsed.data;
     void _kind;
     const profileData = {
+      ...safeSiteProfile,
       ...data,
       profileImageUrl: profileImageUrl || null,
       contactEmail: contactEmail || null,
@@ -423,7 +422,7 @@ async function publishContent(request: Request) {
     const profile = await prisma.siteProfile.upsert({
       where: { id: "main" },
       update: profileData,
-      create: { id: "main", ...profileData }
+      create: { ...profileData, id: "main" }
     });
     return publishedResponse(profile, "site-profile");
   }

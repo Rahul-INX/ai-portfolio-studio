@@ -7,6 +7,7 @@ import { MotionPanel } from "@/components/motion-panel";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
+import { InlineProfileText } from "@/components/inline-profile-text";
 import { EditableHero } from "@/components/editable-hero";
 import { EditableAchievements } from "@/components/editable-achievements";
 import { getAchievements, getExplorerItems, getProjects, getSiteProfile, getSkills } from "@/lib/content";
@@ -88,7 +89,7 @@ export default async function HomePage() {
                 </div>
               ) : null}
               <a href={`mailto:${profile.contactEmail}`} className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
-                <Mail aria-hidden className="h-4 w-4" /> Start a conversation
+                <Mail aria-hidden className="h-4 w-4" /> {profile.contactCtaLabel || "Start a conversation"}
               </a>
             </div>
           </MotionPanel>
@@ -97,7 +98,7 @@ export default async function HomePage() {
 
       <section className="border-b hairline bg-[var(--panel)]">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[0.34fr_1fr] lg:px-8">
-          <p className="eyebrow">Latest evidence</p>
+          <InlineProfileText profile={profile} field="homeLatestEyebrow" label="Latest evidence label" value={profile.homeLatestEyebrow} className="eyebrow" />
           <div>
             <div className="grid gap-px overflow-hidden rounded-lg border hairline bg-[var(--line)] sm:grid-cols-2">
               {recent.map((item) => (
@@ -117,16 +118,35 @@ export default async function HomePage() {
 
       <section id="awards-achievements" className="border-b hairline">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <EditableAchievements items={achievements} profile={profile} />
+          <SectionHeading
+            eyebrow={profile.awardsEyebrow}
+            title={profile.awardsTitle}
+            description={profile.awardsDescription}
+            profile={profile}
+            editable={{
+              eyebrow: "awardsEyebrow",
+              title: "awardsTitle",
+              description: "awardsDescription"
+            }}
+          />
+          <div className="mt-9">
+            <EditableAchievements items={achievements} />
+          </div>
         </div>
       </section>
 
       <section className="border-b hairline">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
           <SectionHeading
-            eyebrow="Selected Systems"
-            title="Systems with inspectable architecture, outcomes, and operating constraints."
-            description="Systems Explorer prioritizes credible proof: the problem, the implementation boundary, measurable signals, and the decisions that make each system reviewable."
+            eyebrow={profile.homeSystemsEyebrow}
+            title={profile.homeSystemsTitle}
+            description={profile.homeSystemsDescription}
+            profile={profile}
+            editable={{
+              eyebrow: "homeSystemsEyebrow",
+              title: "homeSystemsTitle",
+              description: "homeSystemsDescription"
+            }}
           />
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
             {featured.map((item) => (

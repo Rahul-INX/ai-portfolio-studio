@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { readApiResponse } from "@/lib/api-response";
 import { resolvePortfolioMedia } from "@/lib/media";
 import { useEditMode } from "@/components/edit-mode-provider";
-import type { AchievementSignal, SiteProfile } from "@/lib/types";
+import type { AchievementSignal } from "@/lib/types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,10 +70,6 @@ function formatDate(value?: Date | string | null) {
   return new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(date);
 }
 
-function draftKey(draft: Draft, index: number) {
-  return draft.id ?? `local-${index}`;
-}
-
 async function uploadImage(file: File): Promise<string | null> {
   const form = new FormData();
   form.append("file", file);
@@ -84,57 +80,9 @@ async function uploadImage(file: File): Promise<string | null> {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function EditableAchievements({
-  items,
-  profile
-}: {
-  items: AchievementSignal[];
-  profile: SiteProfile;
-}) {
+export function EditableAchievements({ items }: { items: AchievementSignal[] }) {
   const router = useRouter();
   const { authenticated, editMode } = useEditMode();
-
-  // ── Heading draft state ──────────────────────────────────────────────────────
-  const [heading, setHeading] = useState({
-    eyebrow: profile.awardsEyebrow,
-    title: profile.awardsTitle,
-    description: profile.awardsDescription
-  });
-  const [headingStatus, setHeadingStatus] = useState<"clean" | "dirty" | "saving" | "saved" | "error">("clean");
-  const [headingMsg, setHeadingMsg] = useState("");
-  const [headingEditing, setHeadingEditing] = useState(false);
-
-  function patchHeading(patch: Partial<typeof heading>) {
-    setHeading((prev) => ({ ...prev, ...patch }));
-    setHeadingStatus("dirty");
-    setHeadingMsg("");
-  }
-
-  async function saveHeading() {
-    setHeadingStatus("saving");
-    setHeadingMsg("Saving…");
-    try {
-      const response = await fetch("/api/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "site-profile",
-          ...profile,
-          awardsEyebrow: heading.eyebrow,
-          awardsTitle: heading.title,
-          awardsDescription: heading.description
-        })
-      });
-      await readApiResponse(response);
-      setHeadingStatus("saved");
-      setHeadingMsg("Saved ✓");
-      setHeadingEditing(false);
-      router.refresh();
-    } catch (error) {
-      setHeadingStatus("error");
-      setHeadingMsg(error instanceof Error ? error.message : "Save failed.");
-    }
-  }
 
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     items.map((item) => toDraft(item)).sort(
@@ -259,125 +207,23 @@ export function EditableAchievements({
 
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const headingNode = (
-    <div className="grid max-w-5xl gap-4 md:grid-cols-[0.34fr_1fr] md:gap-8">
-      <p className="eyebrow pt-1">{heading.eyebrow}</p>
-      <div>
-        <h2 className="text-balance text-3xl font-semibold tracking-[-0.035em] text-[var(--foreground)] sm:text-4xl">
-          {heading.title}
-        </h2>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
-          {heading.description}
-        </p>
-      </div>
-    </div>
-  );
-
   if (!authenticated) {
-    return (
-      <>
-        {headingNode}
-        <div className="mt-9">
-          <AchievementsDisplay items={drafts} editMode={false} />
-        </div>
-      </>
-    );
+    // Public view — render static achievement display
+    return <AchievementsDisplay items={drafts} editMode={false} />;
   }
 
   return (
-    <>
-      {/* ── Section heading with inline editor ── */}
-      <div className="group/heading relative">
-        {headingEditing ? (
-          <div className="rounded-xl border border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent),transparent_94%)] p-5">
-            <div className="flex items-center justify-between gap-4">
-              <p className="eyebrow text-[var(--accent)]">Editing section heading</p>
-              <button
-                type="button"
-                onClick={() => { setHeadingEditing(false); setHeadingStatus("clean"); setHeadingMsg(""); }}
-                className="grid h-8 w-8 place-items-center rounded-md border hairline hover:bg-[var(--panel)]"
-                aria-label="Close heading editor"
-              >
-                <X aria-hidden className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="mt-4 grid gap-4">
-              <label>
-                <span className="text-xs font-semibold text-[var(--muted)]">Eyebrow</span>
-                <input
-                  value={heading.eyebrow}
-                  onChange={(e) => patchHeading({ eyebrow: e.target.value })}
-                  className="mt-1.5 h-10 w-full rounded-lg border hairline bg-[var(--panel)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-              <label>
-                <span className="text-xs font-semibold text-[var(--muted)]">Title</span>
-                <textarea
-                  value={heading.title}
-                  rows={2}
-                  onChange={(e) => patchHeading({ title: e.target.value })}
-                  className="mt-1.5 w-full resize-none rounded-lg border hairline bg-[var(--panel)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-              <label>
-                <span className="text-xs font-semibold text-[var(--muted)]">Description</span>
-                <textarea
-                  value={heading.description}
-                  rows={3}
-                  onChange={(e) => patchHeading({ description: e.target.value })}
-                  className="mt-1.5 w-full resize-none rounded-lg border hairline bg-[var(--panel)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex items-center gap-3 border-t border-[var(--line)] pt-4">
-              <button
-                type="button"
-                onClick={() => void saveHeading()}
-                disabled={headingStatus === "saving" || headingStatus === "clean"}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--foreground)] px-4 text-xs font-semibold text-[var(--background)] transition hover:opacity-90 disabled:opacity-40"
-              >
-                <Check aria-hidden className="h-3.5 w-3.5" />
-                {headingStatus === "saving" ? "Saving…" : "Save heading"}
-              </button>
-              {headingMsg && (
-                <p className={`text-xs ${headingStatus === "error" ? "text-rose-600 dark:text-rose-400" : "text-[var(--accent)]"}`}>
-                  {headingMsg}
-                </p>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="relative">
-            {headingNode}
-            {editMode && (
-              <button
-                type="button"
-                onClick={() => setHeadingEditing(true)}
-                className="absolute -right-1 -top-1 grid h-8 w-8 place-items-center rounded-md border hairline bg-[var(--panel)] opacity-0 shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)] group-hover/heading:opacity-100"
-                aria-label="Edit section heading"
-              >
-                <Pencil aria-hidden className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Achievement cards ── */}
-      <div className="mt-9">
-        <AchievementsDisplay
-          items={drafts}
-          editMode={editMode}
-          onToggleEdit={openEditor}
-          onClose={closeEditor}
-          onSave={save}
-          onDelete={remove}
-          onAdd={addNew}
-          onPatch={patchDraft}
-          onUpload={uploadImage}
-        />
-      </div>
-    </>
+    <AchievementsDisplay
+      items={drafts}
+      editMode={editMode}
+      onToggleEdit={openEditor}
+      onClose={closeEditor}
+      onSave={save}
+      onDelete={remove}
+      onAdd={addNew}
+      onPatch={patchDraft}
+      onUpload={uploadImage}
+    />
   );
 }
 
@@ -457,7 +303,6 @@ function AchievementsDisplay({
             <AchievementCard
               key={draft.id ?? `local-${rawIndex}`}
               draft={draft}
-              index={index}
               editMode={editMode}
               onToggleEdit={() => onToggleEdit?.(index)}
               onClose={() => onClose?.(index)}
@@ -475,7 +320,7 @@ function AchievementsDisplay({
             <Award aria-hidden className="h-8 w-8 text-[var(--muted)]" />
             <div>
               <p className="font-semibold">No achievements yet</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">Click "Add achievement" above to get started.</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Click &quot;Add achievement&quot; above to get started.</p>
             </div>
           </div>
         )}
@@ -488,7 +333,6 @@ function AchievementsDisplay({
 
 function AchievementCard({
   draft,
-  index,
   editMode,
   onToggleEdit,
   onClose,
@@ -498,7 +342,6 @@ function AchievementCard({
   onUpload
 }: {
   draft: Draft;
-  index: number;
   editMode: boolean;
   onToggleEdit: () => void;
   onClose: () => void;

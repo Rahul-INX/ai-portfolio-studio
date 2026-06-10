@@ -18,6 +18,12 @@ export default async function ExplorerPage() {
           eyebrow={profile.explorerEyebrow}
           title={profile.explorerTitle}
           description={profile.explorerDescription}
+          profile={profile}
+          editable={{
+            eyebrow: "explorerEyebrow",
+            title: "explorerTitle",
+            description: "explorerDescription"
+          }}
         />
         <div className="mt-8">
           <ExplorerClient items={items} />

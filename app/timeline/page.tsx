@@ -5,6 +5,8 @@ import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { getCertifications, getPortfolioDocuments, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
 import { ContextualEditLink } from "@/components/contextual-edit-link";
+import { InlineProfileText } from "@/components/inline-profile-text";
+import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export const metadata: Metadata = {
   title: "Resume and Timeline",
@@ -19,6 +21,15 @@ export default async function TimelinePage() {
     getSiteProfile(),
     getPortfolioDocuments()
   ]);
+
+  // Pre-render all timeline descriptions as sanitized HTML on the server
+  const timelineWithHtml = await Promise.all(
+    timeline.map(async (item) => ({
+      ...item,
+      descriptionHtml: await renderMarkdownToHtml(item.description ?? "")
+    }))
+  );
+
   const resume = documents.find((item) => item.kind === "RESUME");
   const cv = documents.find((item) => item.kind === "CV");
   return (
@@ -28,14 +39,24 @@ export default async function TimelinePage() {
           eyebrow={profile.timelineEyebrow}
           title={profile.timelineTitle}
           description={profile.timelineDescription}
+          profile={profile}
+          editable={{
+            eyebrow: "timelineEyebrow",
+            title: "timelineTitle",
+            description: "timelineDescription"
+          }}
         />
         <div className="mt-10 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="space-y-5">
             <section id="resume-downloads" className="surface scroll-mt-24 rounded-lg p-5">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-sage-700 dark:text-sage-300">Documents</p>
-              <h2 className="mt-3 text-lg font-semibold">Resume & CV Downloads</h2>
+              <p className="font-mono text-xs uppercase tracking-[0.16em] text-sage-700 dark:text-sage-300">
+                <InlineProfileText profile={profile} field="resumeDownloadsEyebrow" label="Resume downloads eyebrow" value={profile.resumeDownloadsEyebrow} />
+              </p>
+              <h2 className="mt-3 text-lg font-semibold">
+                <InlineProfileText profile={profile} field="resumeDownloadsTitle" label="Resume downloads title" value={profile.resumeDownloadsTitle} />
+              </h2>
               <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-                Recruiter-ready downloads and a detailed CV page with project, education, certification, and leadership evidence.
+                <InlineProfileText profile={profile} field="resumeDownloadsDescription" label="Resume downloads description" value={profile.resumeDownloadsDescription} multiline />
               </p>
               <div className="mt-5 grid gap-3">
                 {resume ? (
@@ -44,7 +65,7 @@ export default async function TimelinePage() {
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-ink-900 px-4 text-sm font-medium text-white transition hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
                   >
                     <Download aria-hidden className="h-4 w-4" />
-                    Download Resume
+                    {profile.downloadResumeLabel || "Download Resume"}
                   </a>
                 ) : null}
                 {cv ? (
@@ -53,7 +74,7 @@ export default async function TimelinePage() {
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-md border hairline px-4 text-sm font-medium transition hover:border-cobalt-500"
                   >
                     <Download aria-hidden className="h-4 w-4" />
-                    Download CV
+                    {profile.downloadCvLabel || "Download CV"}
                   </a>
                 ) : null}
                 <Link
@@ -61,12 +82,14 @@ export default async function TimelinePage() {
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-md border hairline px-4 text-sm font-medium transition hover:border-cobalt-500"
                 >
                   <FileText aria-hidden className="h-4 w-4" />
-                  View CV
+                  {profile.viewCvLabel || "View CV"}
                 </Link>
               </div>
             </section>
             <div className="surface rounded-lg p-5">
-              <h2 id="skills" className="scroll-mt-24 text-lg font-semibold">Skill Signals</h2>
+              <h2 id="skills" className="scroll-mt-24 text-lg font-semibold">
+                <InlineProfileText profile={profile} field="skillsTitle" label="Skills title" value={profile.skillsTitle} />
+              </h2>
               <div className="mt-5 space-y-4">
                 {skills.map((skill) => (
                   <div id={`skill-${skill.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`} className="scroll-mt-24" key={skill.name}>
@@ -81,7 +104,9 @@ export default async function TimelinePage() {
                 ))}
               </div>
               <div className="mt-8 border-t hairline pt-6">
-                <h2 id="certifications" className="scroll-mt-24 text-lg font-semibold">Certifications</h2>
+                <h2 id="certifications" className="scroll-mt-24 text-lg font-semibold">
+                  <InlineProfileText profile={profile} field="certificationsTitle" label="Certifications title" value={profile.certificationsTitle} />
+                </h2>
                 <div className="mt-4 space-y-3">
                   {certifications.map((item) => (
                     <div
@@ -98,7 +123,7 @@ export default async function TimelinePage() {
             </div>
           </div>
           <div className="relative space-y-6 before:absolute before:bottom-4 before:left-[0.45rem] before:top-4 before:w-px before:bg-[var(--line-strong)]">
-            {timeline.map((item) => (
+            {timelineWithHtml.map((item) => (
               <article
                 id={`timeline-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`}
                 key={item.title}
@@ -116,9 +141,10 @@ export default async function TimelinePage() {
                   </span>
                   <ContextualEditLink kind="timeline" record={item.title} label={item.title} />
                 </div>
-                <p className="mt-4 leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
-                  {item.description}
-                </p>
+                <div
+                  className="prose-premium prose-premium-sm mt-4"
+                  dangerouslySetInnerHTML={{ __html: item.descriptionHtml }}
+                />
               </article>
             ))}
           </div>

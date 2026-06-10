@@ -18,15 +18,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JobFitResult } from "@/lib/job-fit";
-
-const samplePrompt =
-  "Paste any complete job description. The evaluator derives a role-specific rubric from its responsibilities, requirements, seniority, domain, and preferred qualifications.";
-const generationStages = [
-  "Reading role requirements",
-  "Retrieving portfolio evidence",
-  "Comparing skills and project signals",
-  "Preparing the recruiter brief"
-];
+import { InlineProfileBlock } from "@/components/inline-profile-block";
+import type { SiteProfile } from "@/lib/types";
 
 function scoreTone(score: number) {
   if (score >= 75) return "bg-emerald-500";
@@ -42,7 +35,7 @@ function statusTone(status: string) {
   return "text-rose-700 dark:text-rose-300";
 }
 
-function ResultPanel({ result }: { result: JobFitResult }) {
+function ResultPanel({ result, profile }: { result: JobFitResult; profile: SiteProfile }) {
   const [activeView, setActiveView] = useState<"criteria" | "evidence" | "interview">("criteria");
   const rankedDimensions = [...result.dimensions].sort((a, b) => b.weight - a.weight || a.score - b.score);
   const strongest = [...result.dimensions].filter((item) => item.score >= 52).sort((a, b) => b.score * b.weight - a.score * a.weight).slice(0, 3);
@@ -50,21 +43,34 @@ function ResultPanel({ result }: { result: JobFitResult }) {
   const alignedNotes = result.alignmentNotes.filter((item) => item.status === "Aligned");
   const reviewNotes = result.alignmentNotes.filter((item) => item.status !== "Aligned");
   const evidenceGrade = (score: number) => score >= 80 ? "A" : score >= 65 ? "B" : score >= 50 ? "C" : score >= 30 ? "D" : "Unproven";
-  const decision = result.overallScore >= 78 ? "Strong evidence to proceed" : result.overallScore >= 58 ? "Proceed to focused interview" : result.overallScore >= 35 ? "Proceed with caution" : "Insufficient public evidence";
+  const decision =
+    result.overallScore >= 78
+      ? profile.jobFitProceedStrongLabel || "Strong evidence to proceed"
+      : result.overallScore >= 58
+        ? profile.jobFitProceedFocusLabel || "Proceed to focused interview"
+        : result.overallScore >= 35
+          ? profile.jobFitProceedCautionLabel || "Proceed with caution"
+          : profile.jobFitProceedInsufficientLabel || "Insufficient public evidence";
+  const analysisModeLabel =
+    result.mode === "specialist-agent"
+      ? profile.jobFitSpecialistAnalysisLabel || "Specialist analysis"
+      : profile.jobFitDeterministicAnalysisLabel || "Deterministic analysis";
 
   return (
     <div className="job-fit-dossier min-w-0 space-y-4 overflow-hidden" aria-live="polite">
       <section className="surface overflow-hidden rounded-xl">
         <div className="grid gap-6 border-b hairline p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-end">
           <div>
-            <p className="eyebrow">Decision</p>
+            <p className="eyebrow">{profile.jobFitOutputTitle || "Decision"}</p>
             <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{decision}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">{result.verdict}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+              {profile.jobFitOutputDescription || result.verdict}
+            </p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--muted)]">
-              <span><strong className="text-[var(--foreground)]">{alignedNotes.length}</strong> aligned criteria</span>
-              <span><strong className="text-[var(--foreground)]">{reviewNotes.length}</strong> need validation</span>
-              <span><strong className="text-[var(--foreground)]">{result.topEvidence.length}</strong> cited sources</span>
-              <span>{result.mode === "specialist-agent" ? "Specialist analysis" : "Deterministic analysis"}</span>
+              <span><strong className="text-[var(--foreground)]">{alignedNotes.length}</strong> {profile.jobFitAlignedCriteriaLabel || "aligned criteria"}</span>
+              <span><strong className="text-[var(--foreground)]">{reviewNotes.length}</strong> {profile.jobFitNeedValidationLabel || "need validation"}</span>
+              <span><strong className="text-[var(--foreground)]">{result.topEvidence.length}</strong> {profile.jobFitCitedSourcesLabel || "cited sources"}</span>
+              <span>{analysisModeLabel}</span>
             </div>
           </div>
           <div className="border-t hairline pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
@@ -79,19 +85,25 @@ function ResultPanel({ result }: { result: JobFitResult }) {
 
         <div className="grid divide-y divide-[var(--line)] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
           <div className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Proven strengths</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">
+              <InlineProfileBlock profile={profile} field="jobFitStrengthsTitle" label="Job fit strengths title" value={profile.jobFitStrengthsTitle} />
+            </p>
             <ul className="mt-3 space-y-2 text-sm leading-5">
-              {strongest.length ? strongest.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">No criterion has sufficient direct evidence.</li>}
+              {strongest.length ? strongest.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">{profile.jobFitNoEvidenceLabel || "No criterion has sufficient direct evidence."}</li>}
             </ul>
           </div>
           <div className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--signal)]">Decision risks</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--signal)]">
+              <InlineProfileBlock profile={profile} field="jobFitRisksTitle" label="Job fit risks title" value={profile.jobFitRisksTitle} />
+            </p>
             <ul className="mt-3 space-y-2 text-sm leading-5">
-              {materialGaps.length ? materialGaps.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">No material evidence gaps detected.</li>}
+              {materialGaps.length ? materialGaps.map((item) => <li key={item.name}>{item.name}</li>) : <li className="text-[var(--muted)]">{profile.jobFitNoGapLabel || "No material evidence gaps detected."}</li>}
             </ul>
           </div>
           <div className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">Recommended next step</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">
+              <InlineProfileBlock profile={profile} field="jobFitNextStepTitle" label="Job fit next step title" value={profile.jobFitNextStepTitle} />
+            </p>
             <p className="mt-3 text-sm leading-6">{result.interviewQuestions[0]}</p>
           </div>
         </div>
@@ -99,9 +111,9 @@ function ResultPanel({ result }: { result: JobFitResult }) {
 
       <nav className="surface sticky top-16 z-20 grid grid-cols-3 gap-1 rounded-xl p-1.5 shadow-quiet" aria-label="Fit brief sections">
         {[
-          { id: "criteria", label: "Criteria", count: result.dimensions.length },
-          { id: "evidence", label: "Evidence", count: result.topEvidence.length },
-          { id: "interview", label: "Interview", count: result.interviewQuestions.length }
+          { id: "criteria", label: profile.jobFitCriteriaEyebrow || "Criteria", count: result.dimensions.length },
+          { id: "evidence", label: profile.jobFitEvidenceEyebrow || "Evidence", count: result.topEvidence.length },
+          { id: "interview", label: profile.jobFitProbeTitle || "Interview", count: result.interviewQuestions.length }
         ].map((view) => (
           <button
             key={view.id}
@@ -125,14 +137,18 @@ function ResultPanel({ result }: { result: JobFitResult }) {
       <section className={`${activeView === "criteria" ? "block" : "hidden"} surface max-h-[38rem] overflow-y-auto overscroll-contain rounded-xl p-5 sm:p-6`}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">Highest-weight requirements</p>
-            <h2 className="mt-2 text-xl font-semibold">The criteria most likely to change the hiring decision.</h2>
+            <p className="eyebrow">
+              <InlineProfileBlock profile={profile} field="jobFitCriteriaEyebrow" label="Job fit criteria eyebrow" value={profile.jobFitCriteriaEyebrow} />
+            </p>
+            <h2 className="mt-2 text-xl font-semibold">
+              <InlineProfileBlock profile={profile} field="jobFitCriteriaTitle" label="Job fit criteria title" value={profile.jobFitCriteriaTitle} />
+            </h2>
           </div>
           <span className="text-xs text-[var(--muted)]">{result.dimensions.length} criteria extracted from this JD</span>
         </div>
         <div className="mt-5 overflow-hidden rounded-lg border hairline">
           <div className="hidden grid-cols-[minmax(0,1fr)_7rem_6rem_5rem] gap-4 bg-[var(--surface-support)] px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] md:grid">
-            <span>Requirement</span><span>Priority</span><span>Evidence</span><span className="text-right">Score</span>
+            <span>{profile.jobFitRequirementLabel || "Requirement"}</span><span>{profile.jobFitPriorityLabel || "Priority"}</span><span>{profile.jobFitEvidenceColumnLabel || "Evidence"}</span><span className="text-right">{profile.jobFitScoreLabel || "Score"}</span>
           </div>
           {rankedDimensions.slice(0, 5).map((dimension) => (
             <article key={dimension.name} className="grid gap-3 border-t hairline p-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_7rem_6rem_5rem] md:items-center md:gap-4">
@@ -157,7 +173,7 @@ function ResultPanel({ result }: { result: JobFitResult }) {
         {rankedDimensions.length > 5 ? (
           <details className="group mt-3 rounded-lg border hairline bg-[var(--panel-strong)]">
             <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold">
-              Show all {rankedDimensions.length} requirements
+              {profile.jobFitShowAllLabel || "Show all"} {rankedDimensions.length} requirements
               <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
             </summary>
             <div className="border-t hairline">
@@ -177,12 +193,14 @@ function ResultPanel({ result }: { result: JobFitResult }) {
           <div>
             <div className="flex items-center gap-2">
               <SearchCheck aria-hidden className="h-5 w-5 text-cobalt-500" />
-              <h2 className="text-base font-semibold">Evidence Dashboard</h2>
+              <h2 className="text-base font-semibold">
+                <InlineProfileBlock profile={profile} field="jobFitEvidenceTitle" label="Job fit evidence title" value={profile.jobFitEvidenceTitle} />
+              </h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Only site resources with verified overlap to this JD are shown.</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[var(--muted)]">{result.topEvidence.length} cited source{result.topEvidence.length === 1 ? "" : "s"}</span>
+            <span className="text-xs text-[var(--muted)]">{result.topEvidence.length} {profile.jobFitCitedSourceLabel || "cited source"}{result.topEvidence.length === 1 ? "" : "s"}</span>
             <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
           </div>
         </summary>
@@ -218,7 +236,7 @@ function ResultPanel({ result }: { result: JobFitResult }) {
           </div>
         ) : (
           <div className="mt-5 rounded-md border border-dashed hairline bg-[var(--panel-strong)] p-5">
-            <p className="text-sm font-medium">No relevant public evidence found</p>
+            <p className="text-sm font-medium">{profile.jobFitNoEvidenceLabel || "No relevant public evidence found"}</p>
             <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
               No site resource met the verified-overlap threshold. Requirements remain unproven instead of being matched to nearby content.
             </p>
@@ -231,7 +249,9 @@ function ResultPanel({ result }: { result: JobFitResult }) {
         <section className="surface rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <AlertCircle aria-hidden className="h-5 w-5 text-amber-500" />
-            <h2 className="text-base font-semibold">Gap Analysis</h2>
+            <h2 className="text-base font-semibold">
+              <InlineProfileBlock profile={profile} field="jobFitGapTitle" label="Job fit gap title" value={profile.jobFitGapTitle} />
+            </h2>
           </div>
           <ul className="mt-4 divide-y divide-[var(--line)] border-y hairline">
             {result.gaps.map((gap) => (
@@ -245,7 +265,9 @@ function ResultPanel({ result }: { result: JobFitResult }) {
         <section className="surface rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <CheckCircle2 aria-hidden className="h-5 w-5 text-emerald-500" />
-            <h2 className="text-base font-semibold">Interview Probes</h2>
+            <h2 className="text-base font-semibold">
+              <InlineProfileBlock profile={profile} field="jobFitProbeTitle" label="Job fit probe title" value={profile.jobFitProbeTitle} />
+            </h2>
           </div>
           <ol className="mt-4 divide-y divide-[var(--line)] border-y hairline">
             {result.interviewQuestions.map((question, index) => (
@@ -262,7 +284,9 @@ function ResultPanel({ result }: { result: JobFitResult }) {
         <summary className="flex cursor-pointer list-none items-center justify-between p-5 sm:px-6">
           <div className="flex items-center gap-2">
             <ShieldCheck aria-hidden className="h-5 w-5 text-[var(--accent)]" />
-            <h2 className="text-base font-semibold">Methodology and Unbiased Notes</h2>
+            <h2 className="text-base font-semibold">
+              <InlineProfileBlock profile={profile} field="jobFitMethodologyTitle" label="Job fit methodology title" value={profile.jobFitMethodologyTitle} />
+            </h2>
           </div>
           <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
         </summary>
@@ -274,7 +298,7 @@ function ResultPanel({ result }: { result: JobFitResult }) {
   );
 }
 
-export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
+export function JobFitClient({ timeoutSeconds, profile }: { timeoutSeconds: number; profile: SiteProfile }) {
   const [jdText, setJdText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<JobFitResult | null>(null);
@@ -288,6 +312,12 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
   const canSubmit = useMemo(() => jdText.trim().length >= 80 || Boolean(file), [file, jdText]);
   const elapsedSeconds = timeoutSeconds - secondsRemaining;
   const generationProgress = Math.min(96, Math.max(4, (elapsedSeconds / timeoutSeconds) * 100));
+  const generationStages = [
+    profile.jobFitRunningLabel || "Reading role requirements",
+    "Retrieving portfolio evidence",
+    "Comparing skills and project signals",
+    "Preparing the recruiter brief"
+  ];
   const generationStage =
     generationStages[
       Math.min(
@@ -352,7 +382,7 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <FileText aria-hidden className="h-5 w-5 text-cobalt-500" />
-              <h2 className="text-base font-semibold">{result ? "Analyzed Job Description" : "Job Description"}</h2>
+              <h2 className="text-base font-semibold">{result ? "Analyzed Job Description" : profile.jobFitFormTitle || "Job Description"}</h2>
             </div>
             {result && !editorExpanded ? (
               <>
@@ -364,7 +394,9 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
                 </p>
               </>
             ) : (
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{samplePrompt}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                {profile.jobFitDescription}
+              </p>
             )}
           </div>
 
@@ -376,7 +408,7 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-md border hairline px-3 text-xs font-medium transition hover:border-cobalt-500"
               >
                 <Pencil aria-hidden className="h-3.5 w-3.5" />
-                {editorExpanded ? "Close editor" : "Edit JD"}
+                {editorExpanded ? profile.jobFitCloseLabel || "Close editor" : profile.jobFitEditLabel || "Edit JD"}
               </button>
               <button
                 type="button"
@@ -393,26 +425,26 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
 
         {!result || editorExpanded ? <form onSubmit={(event) => void submit(event)} className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-sm font-medium">Paste JD text</span>
+            <span className="text-sm font-medium">{profile.jobFitPasteLabel || "Paste JD text"}</span>
             <textarea
               value={jdText}
               onChange={(event) => setJdText(event.target.value)}
-              placeholder="Paste responsibilities, required skills, preferred qualifications, and role context..."
+              placeholder={profile.jobFitDescription}
               className="mt-2 min-h-72 w-full resize-y rounded-md border hairline bg-[var(--panel-strong)] p-3 text-sm leading-6 outline-none transition placeholder:text-[color-mix(in_srgb,var(--foreground),transparent_58%)] focus:border-cobalt-500"
             />
           </label>
 
           <div className="flex items-center justify-between gap-3 text-xs text-[var(--muted)]">
             <span>{characterCount.toLocaleString()} characters</span>
-            <span>Ephemeral analysis only</span>
+            <span>{profile.jobFitEphemeralLabel || "Ephemeral analysis only"}</span>
           </div>
 
           <label className="block min-w-0 overflow-hidden rounded-md border border-dashed hairline bg-[var(--panel-strong)] p-4 transition hover:border-cobalt-500">
             <span className="flex items-center gap-2 text-sm font-medium">
               <Upload aria-hidden className="h-4 w-4 text-cobalt-500" />
-              Attach JD file
+              {profile.jobFitAttachLabel || "Attach JD file"}
             </span>
-            <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Supports .txt, .pdf, and .docx up to 4 MB.</span>
+            <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{profile.jobFitAttachHelp || "Supports .txt, .pdf, and .docx up to 4 MB."}</span>
             <input
               type="file"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -433,7 +465,7 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-ink-50 dark:text-ink-950"
           >
             {loading ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <SearchCheck aria-hidden className="h-4 w-4" />}
-            {result ? "Regenerate Fit Brief" : "Generate Fit Brief"}
+            {result ? profile.jobFitRegenerateLabel || "Regenerate Fit Brief" : profile.jobFitGenerateLabel || "Generate Fit Brief"}
           </button>
         </form> : null}
       </section>
@@ -452,13 +484,13 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
               </div>
 
               <p className="mt-6 font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-                AI evidence analysis
+                {profile.jobFitLoadingEyebrow || "AI evidence analysis"}
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-normal">Building the Role Fit Brief</h2>
+              <h2 className="mt-3 text-2xl font-semibold tracking-normal">{profile.jobFitLoadingTitle || "Building the Role Fit Brief"}</h2>
               <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
                 {secondsRemaining > 0
-                  ? `Generating results in up to ${secondsRemaining} second${secondsRemaining === 1 ? "" : "s"}...`
-                  : "Finalizing your evidence-backed results..."}
+                  ? profile.jobFitLoadingDescription || `Generating results in up to ${secondsRemaining} second${secondsRemaining === 1 ? "" : "s"}...`
+                  : profile.jobFitFinalizingLabel || "Finalizing your evidence-backed results..."}
               </p>
 
               <div className="mt-7 overflow-hidden rounded-full border hairline bg-[color-mix(in_srgb,var(--foreground),transparent_92%)] p-1">
@@ -478,14 +510,14 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
             </div>
           </section>
         ) : result ? (
-          <ResultPanel result={result} />
+          <ResultPanel result={result} profile={profile} />
         ) : (
           <section className="surface min-h-[28rem] rounded-lg p-6">
             <div className="grid gap-4 md:grid-cols-3">
               {[
-                { icon: Gauge, label: "Fit score", value: "0-100" },
-                { icon: BarChart3, label: "Rubric", value: "Derived from this JD" },
-                { icon: ShieldCheck, label: "Evidence", value: "Public site data" }
+                { icon: Gauge, label: profile.jobFitStatScoreLabel || "Fit score", value: "0-100" },
+                { icon: BarChart3, label: profile.jobFitStatRubricLabel || "Rubric", value: "Derived from this JD" },
+                { icon: ShieldCheck, label: profile.jobFitStatEvidenceLabel || "Evidence", value: "Public site data" }
               ].map((item) => (
                 <div key={item.label} className="rounded-md border hairline bg-[var(--panel-strong)] p-4">
                   <item.icon aria-hidden className="h-5 w-5 text-cobalt-500" />
@@ -496,11 +528,16 @@ export function JobFitClient({ timeoutSeconds }: { timeoutSeconds: number }) {
             </div>
             <div className="mt-8 rounded-md border hairline bg-[var(--panel-strong)] p-5">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-                Output Template
+                <InlineProfileBlock profile={profile} field="jobFitTemplateTitle" label="Job fit template title" value={profile.jobFitTemplateTitle} />
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-normal">A repeatable recruiter dashboard, not a black-box claim.</h2>
+              <h2 className="mt-3 text-2xl font-semibold tracking-normal">
+                <InlineProfileBlock profile={profile} field="jobFitOutputTitle" label="Job fit output title" value={profile.jobFitOutputTitle} />
+              </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-                The brief returns overall fit, factor bars, requirement notes, relevant evidence with compact citations, gaps, interview probes, and fairness notes.
+                <InlineProfileBlock profile={profile} field="jobFitOutputDescription" label="Job fit output description" value={profile.jobFitOutputDescription} />
+              </p>
+              <p className="mt-3 max-w-2xl text-xs leading-5 text-[var(--muted)]">
+                <InlineProfileBlock profile={profile} field="jobFitTemplateDescription" label="Job fit template description" value={profile.jobFitTemplateDescription} />
               </p>
             </div>
           </section>

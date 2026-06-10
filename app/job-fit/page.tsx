@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JobFitClient } from "@/components/job-fit-client";
+import { InlineProfileBlock } from "@/components/inline-profile-block";
 import { SiteShell } from "@/components/site-shell";
 import { getSiteProfile } from "@/lib/content";
 import { getJobFitSettings } from "@/lib/job-fit-settings";
@@ -16,18 +17,16 @@ export default async function JobFitPage() {
     <SiteShell profile={profile}>
       <section className="mx-auto max-w-7xl overflow-x-clip px-4 py-12 sm:px-6 lg:px-8 lg:py-14">
         <div className="max-w-4xl">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
-            Recruiter Fit Review
-          </p>
+          <InlineProfileBlock profile={profile} field="jobFitEyebrow" label="Job fit eyebrow" value={profile.jobFitEyebrow} className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300" />
           <h1 className="mt-5 text-4xl font-semibold tracking-normal text-[var(--foreground)] sm:text-5xl">
-            Role Fit Brief
+            <InlineProfileBlock profile={profile} field="jobFitTitle" label="Job fit title" value={profile.jobFitTitle} />
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
-            Paste or attach any job description to compare the role against {profile.name}&apos;s public portfolio evidence. The evaluator derives a rubric from that JD, names missing proof clearly, and avoids unverifiable claims.
+            <InlineProfileBlock profile={profile} field="jobFitDescription" label="Job fit description" value={profile.jobFitDescription} />
           </p>
         </div>
         <div className="mt-8">
-          <JobFitClient timeoutSeconds={settings.fallbackTimeoutSeconds} />
+          <JobFitClient timeoutSeconds={settings.fallbackTimeoutSeconds} profile={profile} />
         </div>
       </section>
     </SiteShell>

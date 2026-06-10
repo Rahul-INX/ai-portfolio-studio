@@ -12,19 +12,18 @@ import { authOptions } from "@/lib/auth";
 import { safeSiteProfile } from "@/lib/safe-content";
 import type { SiteProfile } from "@/lib/types";
 
-const nav = [
-  { href: "/explorer", label: "Systems Explorer" },
-  { href: "/timeline", label: "Experience" },
-  { href: "/timeline#resume-downloads", label: "Resume" },
-  { href: "/job-fit", label: "Check Job Fit", shortLabel: "Job Fit" },
-];
-
 function telHref(phone?: string | null) {
   return phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
 }
 
 export async function SiteShell({ children, profile = safeSiteProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
   const session = await getServerSession(authOptions);
+  const nav = [
+    { href: "/explorer", label: profile.navExplorerLabel || "Systems Explorer" },
+    { href: "/timeline", label: profile.navExperienceLabel || "Experience" },
+    { href: "/timeline#resume-downloads", label: profile.navResumeLabel || "Resume" },
+    { href: "/job-fit", label: profile.navJobFitLabel || "Check Job Fit", shortLabel: "Job Fit" },
+  ];
   const contactItems = [
     profile.contactEmail ? { label: profile.contactEmail, href: `mailto:${profile.contactEmail}`, icon: Mail } : null,
     profile.contactPhone ? { label: profile.contactPhone, href: telHref(profile.contactPhone), icon: Phone } : null,
@@ -41,7 +40,7 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
 
   return (
     <EditModeProvider authenticated={Boolean(session?.user?.id)}>
-    <div className="min-h-screen">
+      <div className="min-h-screen">
       <NavigationFeedback />
       <a
         href="#main"
@@ -139,7 +138,7 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
                   href="/admin"
                   className="shrink-0 rounded-md px-2.5 py-2 text-xs font-semibold text-cobalt-600 transition hover:bg-[var(--panel)] hover:text-cobalt-700 sm:px-3 sm:text-sm dark:text-cobalt-300 dark:hover:text-cobalt-200"
                 >
-                  Admin CMS
+                  {profile.adminCmsLabel || "Admin CMS"}
                 </Link>
               ) : null}
             </nav>
@@ -213,7 +212,7 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
       </header>
       <main id="main">{children}</main>
       <PortfolioAssistant ownerName={profile.name} />
-    </div>
+      </div>
     </EditModeProvider>
   );
 }

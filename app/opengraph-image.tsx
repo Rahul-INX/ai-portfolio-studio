@@ -24,14 +24,14 @@ export default async function OpenGraphImage() {
       >
         <div style={{ display: "flex", justifyContent: "space-between", color: "#bccbb2", fontSize: 24, letterSpacing: 4, textTransform: "uppercase" }}>
           <span>{profile.role}</span>
-          <span>Projects / Evidence / Experience</span>
+          <span>{profile.ogTopLabel}</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ fontSize: 76, lineHeight: 1.05, fontWeight: 700 }}>{profile.name}</div>
           <div style={{ maxWidth: 880, color: "#aeb9aa", fontSize: 30, lineHeight: 1.35 }}>{profile.seoDescription}</div>
         </div>
         <div style={{ display: "flex", gap: 18, color: "#79b8a7", fontSize: 24 }}>
-          <span>Evidence-first portfolio</span><span>/</span><span>Recruiter-ready navigation</span><span>/</span><span>Editable CMS</span>
+          <span>{profile.ogCenterLabel}</span><span>/</span><span>{profile.ogFooterLabel}</span>
         </div>
       </div>
     ),

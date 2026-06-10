@@ -296,6 +296,45 @@ a {
   margin: 2em 0;
 }
 
+/* ─── Compact card variant ────────────────────────────────────── */
+
+.prose-premium-sm {
+  font-size: 0.925rem;
+  line-height: 1.7;
+}
+
+.prose-premium-sm p {
+  margin-bottom: 0.85em;
+}
+
+.prose-premium-sm p:last-child {
+  margin-bottom: 0;
+}
+
+.prose-premium-sm h2,
+.prose-premium-sm h3,
+.prose-premium-sm h4 {
+  font-size: 1rem;
+  margin-top: 1.25em;
+  margin-bottom: 0.4em;
+}
+
+.prose-premium-sm ul,
+.prose-premium-sm ol {
+  margin-top: 0.35em;
+  margin-bottom: 0.85em;
+}
+
+.prose-premium-sm li {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+.prose-premium-sm a {
+  font-weight: 500;
+}
+
+
 /* ─── Markdown Editor Component ────────────────────────────────── */
 
 .markdown-editor {

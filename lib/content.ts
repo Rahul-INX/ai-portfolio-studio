@@ -97,7 +97,18 @@ export const getSiteProfile = cache(async (): Promise<SiteProfile> => {
   if (!canReadDatabase()) return safeSiteProfile;
   try {
     const profile = await withRetry(() => prisma.siteProfile.findUnique({ where: { id: "main" } }));
-    return profile ?? safeSiteProfile;
+    return profile
+      ? {
+          ...safeSiteProfile,
+          ...profile,
+          profileImageUrl: profile.profileImageUrl ?? null,
+          contactEmail: profile.contactEmail ?? null,
+          contactPhone: profile.contactPhone ?? null,
+          contactLocation: profile.contactLocation ?? null,
+          githubUrl: profile.githubUrl ?? null,
+          linkedinUrl: profile.linkedinUrl ?? null
+        }
+      : safeSiteProfile;
   } catch (error) {
     markDatabaseUnavailable(error);
     return safeSiteProfile;

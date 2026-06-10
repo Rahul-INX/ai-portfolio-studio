@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { ExplorerItem } from "@/lib/types";
 import { ContextualEditLink } from "@/components/contextual-edit-link";
+import { InlineContentField } from "@/components/inline-content-field";
 
 const kindLabel: Record<ExplorerItem["kind"], string> = {
   project: "Project",
@@ -55,10 +56,12 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
         </Link>
         </div>
       </div>
-      <h3 className="mt-6 text-2xl font-semibold tracking-[-0.025em]">{item.title}</h3>
-      <p className="mt-3 line-clamp-3 text-sm leading-6 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
-        {summary}
-      </p>
+      <div className="mt-6 text-2xl font-semibold tracking-[-0.025em]">
+        <InlineContentField item={item} field="title" label={`${item.title} title`} value={item.title} />
+      </div>
+      <div className="mt-3 line-clamp-3 text-sm leading-6 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
+        <InlineContentField item={item} field={item.kind === "blog" ? "excerpt" : "summary"} label={`${item.title} summary`} value={summary} multiline />
+      </div>
       {projectMetric ? (
         <div className="mt-5 border-l-2 border-[var(--signal)] pl-3">
           <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{projectMetric.label}</p>

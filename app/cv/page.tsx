@@ -4,10 +4,11 @@ import { Download, FileText } from "lucide-react";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { getCertifications, getPortfolioDocuments, getProjects, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
+import { InlineProfileText } from "@/components/inline-profile-text";
 
 export const metadata: Metadata = { title: "Detailed CV", description: "Detailed public portfolio CV with projects, skills, experience, and certifications." };
 
-function SectionShell({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function SectionShell({ id, title, children }: { id: string; title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={id} className="surface scroll-mt-24 rounded-lg p-6">
       <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
@@ -27,9 +28,15 @@ export default async function CvPage() {
     <SiteShell profile={profile}>
       <article className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Detailed CV"
+          eyebrow={profile.cvHeadingEyebrow}
           title={profile.name}
           description={profile.heroSummary}
+          profile={profile}
+          editable={{
+            eyebrow: "cvHeadingEyebrow",
+            title: "name",
+            description: "heroSummary"
+          }}
         />
         <div className="mt-8 flex flex-wrap gap-3">
           {cv ? (
@@ -38,7 +45,7 @@ export default async function CvPage() {
               className="inline-flex h-11 items-center gap-2 rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
             >
               <Download aria-hidden className="h-4 w-4" />
-              Download CV
+              {profile.downloadCvLabel || "Download CV"}
             </a>
           ) : null}
           {resume ? (
@@ -47,23 +54,28 @@ export default async function CvPage() {
               className="inline-flex h-11 items-center gap-2 rounded-md border hairline px-5 text-sm font-medium transition hover:border-cobalt-500"
             >
               <FileText aria-hidden className="h-4 w-4" />
-              Download Resume
+              {profile.downloadResumeLabel || "Download Resume"}
             </a>
           ) : null}
           <Link
             href="/timeline#resume-downloads"
             className="inline-flex h-11 items-center rounded-md border hairline px-5 text-sm font-medium transition hover:border-cobalt-500"
           >
-            Resume hub
+            {profile.viewCvLabel || "Resume hub"}
           </Link>
         </div>
 
         <div className="mt-10 grid gap-5">
-          <SectionShell id="summary" title="Professional Summary">
+          <SectionShell
+            id="summary"
+            title={
+              <InlineProfileText profile={profile} field="cvSummaryTitle" label="CV summary title" value={profile.cvSummaryTitle} />
+            }
+          >
             <p className="leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_24%)]">{profile.seoDescription}</p>
           </SectionShell>
 
-          <SectionShell id="skills" title="Skills">
+          <SectionShell id="skills" title={profile.skillsTitle}>
             <div className="grid gap-3 sm:grid-cols-2">
               {skills.map((skill) => (
                 <div key={skill.name} className="rounded-md border hairline p-3 text-sm leading-6 text-[var(--muted)]">
@@ -73,7 +85,7 @@ export default async function CvPage() {
             </div>
           </SectionShell>
 
-          <SectionShell id="projects" title="Selected Projects">
+          <SectionShell id="projects" title={profile.cvProjectsTitle}>
             <div className="space-y-4">
               {projects.map((project) => (
                 <article key={project.title} className="rounded-md border hairline p-4">
@@ -85,7 +97,7 @@ export default async function CvPage() {
             </div>
           </SectionShell>
 
-          <SectionShell id="experience" title="Experience">
+          <SectionShell id="experience" title={profile.cvExperienceTitle}>
             <div className="space-y-4">
               {timeline.map((item) => (
                 <article key={item.title}>
@@ -98,7 +110,7 @@ export default async function CvPage() {
             </div>
           </SectionShell>
 
-          <SectionShell id="certifications" title="Certifications">
+          <SectionShell id="certifications" title={profile.cvCertificationsTitle}>
             <div className="grid gap-3 sm:grid-cols-2">
               {certifications.map((item) => (
                 <div key={`${item.title}-${item.issuer}`} className="rounded-md border hairline p-3 text-sm text-[var(--muted)]">
