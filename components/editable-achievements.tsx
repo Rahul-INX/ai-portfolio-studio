@@ -311,8 +311,8 @@ function AchievementsDisplay({
               editMode={editMode}
               onToggleEdit={() => onToggleEdit?.(index)}
               onClose={() => onClose?.(index)}
-              onSave={() => onSave?.(index)}
-              onDelete={() => onDelete?.(index)}
+              onSave={async () => { await onSave?.(index); }}
+              onDelete={async () => { await onDelete?.(index); }}
               onPatch={(patch) => onPatch?.(index, patch)}
               onUpload={onUpload}
             />
