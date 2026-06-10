@@ -7,6 +7,7 @@ export type EditableContentKind =
   | "dashboard"
   | "skill"
   | "certification"
+  | "achievement"
   | "timeline"
   | "document";
 
@@ -26,7 +27,7 @@ export function affectedContentPaths(kind: EditableContentKind, slug?: string) {
               ? ["/", "/explorer", slug ? `/blog/${slug}` : undefined]
               : kind === "dashboard"
                 ? ["/", "/explorer", slug ? `/dashboard/${slug}` : undefined]
-                : kind === "skill"
+                : kind === "skill" || kind === "achievement"
                   ? ["/"]
                   : ["/timeline"];
 

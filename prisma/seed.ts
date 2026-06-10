@@ -2,6 +2,7 @@ import { hash } from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import {
   safeBlogs,
+  safeAchievements,
   safeCaseStudies,
   safeCertifications,
   safeDashboards,
@@ -228,6 +229,24 @@ async function main() {
 
   await prisma.certification.deleteMany();
   await prisma.certification.createMany({ data: safeCertifications });
+
+  await prisma.achievement.deleteMany();
+  await prisma.achievement.createMany({
+    data: safeAchievements.map((achievement) => ({
+      title: achievement.title,
+      issuer: achievement.issuer,
+      category: achievement.category,
+      summary: achievement.summary,
+      awardedAt: achievement.awardedAt ? new Date(achievement.awardedAt) : null,
+      proofUrl: achievement.proofUrl,
+      imageUrl: achievement.imageUrl,
+      imageRatio: achievement.imageRatio,
+      highlighted: achievement.highlighted,
+      sortOrder: achievement.sortOrder,
+      visibility: "PUBLISHED",
+      publishedAt: achievement.publishedAt ? new Date(achievement.publishedAt) : new Date()
+    }))
+  });
 
   for (const document of safePortfolioDocuments) {
     await prisma.portfolioDocument.upsert({

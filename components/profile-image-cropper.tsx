@@ -152,7 +152,7 @@ export function ProfileImageCropper({
         </div>
       ) : (
         <div className="grid gap-4 p-4 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-md border hairline bg-[var(--panel)]">
+          <div className="relative aspect-[4/5] overflow-hidden rounded-md border-2 border-[var(--line-strong)] bg-[var(--panel)]">
             {value ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={resolvePortfolioMedia(value)} alt="Profile portrait preview" className="h-full w-full object-cover" />

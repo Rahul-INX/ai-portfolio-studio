@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   DOCUMENT_TYPES,
+  getMimeTypeByExtension,
   MAX_DATABASE_FILE_SIZE,
   requestIsTooLarge,
   safeFileName,
@@ -41,17 +42,23 @@ export async function POST(request: Request) {
     if (file.size > MAX_DATABASE_FILE_SIZE) {
       return errorResponse("Document exceeds 4 MB limit.", 413);
     }
-    if (!DOCUMENT_TYPES.has(file.type)) {
-      return errorResponse(
-        "Unsupported document type. Upload PDF, DOC, or DOCX.",
-        415,
-      );
+    let fileType = file.type;
+    if (!DOCUMENT_TYPES.has(fileType)) {
+      const fallbackMime = getMimeTypeByExtension(file.name);
+      if (fallbackMime && DOCUMENT_TYPES.has(fallbackMime)) {
+        fileType = fallbackMime;
+      } else {
+        return errorResponse(
+          "Unsupported document type. Upload PDF, DOC, or DOCX.",
+          415,
+        );
+      }
     }
 
     const stored = await prisma.storedFile.create({
       data: {
         fileName: safeFileName(file.name, "portfolio-document"),
-        contentType: file.type,
+        contentType: fileType,
         size: file.size,
         data: Buffer.from(await file.arrayBuffer()),
       },

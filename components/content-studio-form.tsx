@@ -10,6 +10,7 @@ import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { readApiResponse } from "@/lib/api-response";
 import { resolvePortfolioMedia } from "@/lib/media";
 import type {
+  AchievementSignal,
   CertificationSignal,
   PortfolioDocument,
   SafeBlog,
@@ -31,10 +32,18 @@ type EditableKind =
   | "dashboard"
   | "skill"
   | "certification"
+  | "achievement"
   | "timeline"
   | "document";
 
-type EditableRecord = Record<string, unknown> & { id?: string; kind?: EditableKind; title?: string; slug?: string; name?: string };
+type EditableRecord = Record<string, unknown> & {
+  id?: string;
+  kind?: EditableKind;
+  title?: string;
+  slug?: string;
+  name?: string;
+  documentKind?: string;
+};
 
 type StudioData = {
   profile: SiteProfile;
@@ -45,6 +54,7 @@ type StudioData = {
   dashboards: SafeDashboard[];
   skills: SkillSignal[];
   certifications: CertificationSignal[];
+  achievements: AchievementSignal[];
   timeline: TimelineItem[];
   documents: PortfolioDocument[];
 };
@@ -58,6 +68,7 @@ const kindLabels: Record<EditableKind, string> = {
   dashboard: "Dashboard",
   skill: "Skill",
   certification: "Certification",
+  achievement: "Achievement",
   timeline: "Timeline Event",
   document: "Document"
 };
@@ -103,6 +114,7 @@ const textFields: Record<EditableKind, string[]> = {
   dashboard: ["summary", "embedUrl", "imageUrl"],
   skill: ["category", "level", "weight"],
   certification: ["issuer", "issuedAt", "url"],
+  achievement: ["issuer", "category", "summary", "awardedAt", "proofUrl", "imageUrl", "imageRatio", "highlighted", "sortOrder"],
   timeline: ["period", "description", "signal", "sortOrder"],
   document: ["description", "fileUrl", "versionLabel"]
 };
@@ -118,6 +130,7 @@ const longFields = new Set([
   "context",
   "approach",
   "businessValue",
+  "summary",
   "hypothesis",
   "method",
   "findings",
@@ -253,6 +266,29 @@ function labelFor(field: string) {
     .replace("Seo", "SEO");
 }
 
+function recordKey(record: EditableRecord, index: number) {
+  return String(record.id ?? record.slug ?? record.name ?? record.title ?? index);
+}
+
+function recordMatchesSelection(record: EditableRecord, index: number, key: string) {
+  const candidates = [
+    record.id,
+    record.slug,
+    record.name,
+    record.title,
+    record.kind === "document" ? record.documentKind : undefined,
+    String(index)
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map(String);
+
+  return candidates.includes(key);
+}
+
+function findRecordBySelection(records: EditableRecord[], key: string) {
+  return records.find((item, index) => recordMatchesSelection(item, index, key));
+}
+
 export function ContentStudioForm({ data }: { data: StudioData }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -280,6 +316,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
       dashboard: data.dashboards.map((item) => ({ ...item, kind: "dashboard" })),
       skill: data.skills.map((item) => ({ ...item, kind: "skill", title: item.name })),
       certification: data.certifications.map((item) => ({ ...item, kind: "certification" })),
+      achievement: data.achievements.map((item) => ({ ...item, kind: "achievement" })),
       timeline: data.timeline.map((item) => ({ ...item, kind: "timeline" })),
       document: data.documents.map((item) => ({ ...item, id: item.kind, documentKind: item.kind, kind: "document", title: item.title }))
     }),
@@ -293,9 +330,9 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
   }
 
   function loadRecord(nextKind: EditableKind, key: string) {
-    const record = records[nextKind].find((item, index) => recordKey(item, index) === key);
+    const record = findRecordBySelection(records[nextKind], key);
     setMessage("");
-    setSelectedKey(key);
+    setSelectedKey(record ? recordKey(record, records[nextKind].indexOf(record)) : key);
     if (!record) {
       setTitle("");
       setSlug("");
@@ -314,7 +351,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
             ? jsonValue(record.metrics, [])
             : field === "architectureCanvasJson"
               ? jsonValue(record.architectureCanvas, { layers: [], principles: [], riskControls: [] })
-              : ["issuedAt", "startDate", "endDate"].includes(field)
+              : ["issuedAt", "awardedAt", "startDate", "endDate"].includes(field)
                 ? dateValue(record[field])
                 : String(record[field] ?? "");
         return [field, value];
@@ -357,10 +394,6 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
     // Query parameters are only an initial contextual entry point.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  function recordKey(record: EditableRecord, index: number) {
-    return String(record.id ?? record.slug ?? record.name ?? record.title ?? index);
-  }
 
   function recordLabel(record: EditableRecord) {
     return String(record.title ?? record.name ?? record.slug ?? "Untitled");
@@ -411,8 +444,9 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
     event.preventDefault();
     setSaving(true);
     setMessage("Saving changes...");
-    const selected = selectedRecords.find((item, index) => recordKey(item, index) === selectedKey);
+    const selected = findRecordBySelection(selectedRecords, selectedKey);
     const common = {
+      id: selectedKey !== "new" ? selected?.id : undefined,
       kind,
       title,
       slug: slug || slugify(title),
@@ -496,24 +530,39 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                             issuedAt: fieldValues.issuedAt,
                             url: fieldValues.url
                           }
-                        : kind === "document"
+                        : kind === "achievement"
                           ? {
                               kind,
-                              documentKind: String(selected?.documentKind ?? selected?.kind ?? selectedKey) === "CV" ? "CV" : "RESUME",
+                              id: selected?.id,
                               title,
-                              description: fieldValues.description,
-                              fileUrl: fieldValues.fileUrl,
-                              versionLabel: fieldValues.versionLabel
+                              issuer: fieldValues.issuer,
+                              category: fieldValues.category,
+                              summary: fieldValues.summary,
+                              awardedAt: fieldValues.awardedAt,
+                              proofUrl: fieldValues.proofUrl,
+                              imageUrl: fieldValues.imageUrl,
+                              imageRatio: fieldValues.imageRatio || "4/3",
+                              highlighted: fieldValues.highlighted === "true",
+                              sortOrder: Number(fieldValues.sortOrder || 0)
                             }
-                        : {
-                          kind,
-                          id: selected?.id,
-                          title,
-                          period: fieldValues.period,
-                          description: fieldValues.description,
-                          signal: fieldValues.signal,
-                          sortOrder: Number(fieldValues.sortOrder || 0)
-                        };
+                          : kind === "document"
+                            ? {
+                                kind,
+                                documentKind: String(selected?.documentKind ?? selected?.kind ?? selectedKey) === "CV" ? "CV" : "RESUME",
+                                title,
+                                description: fieldValues.description,
+                                fileUrl: fieldValues.fileUrl,
+                                versionLabel: fieldValues.versionLabel
+                              }
+                            : {
+                              kind,
+                              id: selected?.id,
+                              title,
+                              period: fieldValues.period,
+                              description: fieldValues.description,
+                              signal: fieldValues.signal,
+                              sortOrder: Number(fieldValues.sortOrder || 0)
+                            };
 
     try {
       const response = await fetch("/api/content", {
@@ -582,7 +631,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
               className="mt-2 h-11 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3 outline-none focus:border-cobalt-500"
             />
           </label>
-          {!["skill", "certification", "timeline", "document"].includes(kind) ? (
+          {!["skill", "certification", "achievement", "timeline", "document"].includes(kind) ? (
             <label>
               <span className="text-sm font-medium">Slug</span>
               <input
@@ -670,11 +719,13 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
               value={fieldValues[field] ?? ""}
               onChange={(value) => setFieldValues((current) => ({ ...current, [field]: value }))}
             />
-          ) : field === "featured" ? (
+          ) : ["featured", "highlighted"].includes(field) ? (
             <label key={field} className="flex items-center justify-between gap-4 rounded-lg border hairline bg-[var(--panel-strong)] p-4">
               <span>
-                <span className="block text-sm font-semibold">Featured project</span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">Promote this project in selected-work surfaces.</span>
+                <span className="block text-sm font-semibold">{field === "featured" ? "Featured project" : "Highlight achievement"}</span>
+                <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">
+                  {field === "featured" ? "Promote this project in selected-work surfaces." : "Promote this achievement in the landing-page credibility section."}
+                </span>
               </span>
               <span className="relative inline-flex">
                 <input
@@ -686,7 +737,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                 <span className="h-6 w-11 rounded-full bg-[var(--line)] transition peer-checked:bg-cobalt-600 peer-focus-visible:ring-2 peer-focus-visible:ring-cobalt-500 peer-focus-visible:ring-offset-2 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
               </span>
             </label>
-          ) : ["startDate", "endDate", "issuedAt"].includes(field) ? (
+          ) : ["startDate", "endDate", "issuedAt", "awardedAt"].includes(field) ? (
             <label key={field}>
               <span className="text-sm font-medium">{labelFor(field)}</span>
               <input
@@ -708,7 +759,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                 className="mt-2 h-11 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3 outline-none focus:border-cobalt-500"
               />
             </label>
-          ) : ["githubUrl", "demoUrl", "embedUrl", "url"].includes(field) ? (
+          ) : ["githubUrl", "demoUrl", "embedUrl", "url", "proofUrl"].includes(field) ? (
             <label key={field}>
               <span className="text-sm font-medium">{labelFor(field)}</span>
               <input
@@ -720,10 +771,23 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                 className="mt-2 h-11 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3 outline-none focus:border-cobalt-500"
               />
             </label>
+          ) : field === "imageRatio" ? (
+            <label key={field}>
+              <span className="text-sm font-medium">Image ratio</span>
+              <select
+                value={fieldValues[field] || "4/3"}
+                onChange={(event) => setFieldValues((current) => ({ ...current, [field]: event.target.value }))}
+                className="mt-2 h-11 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3"
+              >
+                <option value="4/3">4:3 balanced card</option>
+                <option value="16/9">16:9 wide certificate</option>
+                <option value="1/1">1:1 square badge</option>
+              </select>
+            </label>
           ) : field === "imageUrl" ? (
           <div key={field} className="overflow-hidden rounded-md border hairline bg-[var(--panel-strong)] md:col-span-2">
             <div className="grid gap-4 p-4 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-md border hairline bg-[var(--panel)]">
+              <div className={`relative overflow-hidden rounded-md border-2 border-[var(--line-strong)] bg-[var(--panel)] ${fieldValues.imageRatio === "16/9" ? "aspect-video" : fieldValues.imageRatio === "1/1" ? "aspect-square" : "aspect-[4/3]"}`}>
                 {fieldValues[field] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -819,7 +883,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         </label>
       ) : null}
 
-      {!["site-profile", "skill", "certification", "timeline", "document"].includes(kind) ? (
+      {!["site-profile", "skill", "certification", "achievement", "timeline", "document"].includes(kind) ? (
         <label>
           <span className="text-sm font-medium">Tags, comma separated</span>
           <input
@@ -832,15 +896,53 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
 
       <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         {message ? <p className="text-sm text-[var(--muted)]" aria-live="polite">{message}</p> : <p className="text-sm text-[var(--muted)]">No unsaved changes.</p>}
-        {hasUnsavedChanges ? (
-          <button
-            type="submit"
-            disabled={saving}
-            className="h-11 w-full rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:opacity-60 sm:w-auto dark:bg-ink-50 dark:text-ink-950"
-          >
-            {saving ? "Saving..." : "Save editable content"}
-          </button>
-        ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {!["site-profile", "document"].includes(kind) && selectedKey !== "new" ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                const record = findRecordBySelection(selectedRecords, selectedKey);
+                if (!record?.id) return;
+                const confirmMessage = `Are you sure you want to delete this ${kindLabels[kind].toLowerCase()}? This action cannot be undone.`;
+                if (!window.confirm(confirmMessage)) return;
+
+                setSaving(true);
+                setMessage("Deleting content...");
+                try {
+                  const response = await fetch("/api/content", {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ kind, id: record.id })
+                  });
+                  await readApiResponse(response);
+                  setMessage("Deleted successfully.");
+                  // Force a clean page reload to update database list and reset selection parameters
+                  window.location.href = `/admin/new-project?kind=${kind}&record=new`;
+                } catch (error) {
+                  setMessage(
+                    `Delete failed: ${error instanceof Error ? error.message : "The server could not be reached."}`
+                  );
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-rose-300 bg-transparent px-5 text-sm font-medium text-rose-600 transition hover:border-rose-400 hover:bg-rose-50/50 sm:w-auto dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/20"
+            >
+              <Trash2 aria-hidden className="h-4 w-4" />
+              Delete {kindLabels[kind].toLowerCase()}
+            </button>
+          ) : null}
+          {hasUnsavedChanges ? (
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-11 w-full rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:opacity-60 sm:w-auto dark:bg-ink-50 dark:text-ink-950"
+            >
+              {saving ? "Saving..." : "Save editable content"}
+            </button>
+          ) : null}
+        </div>
       </div>
     </form>
   );

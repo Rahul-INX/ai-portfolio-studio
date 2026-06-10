@@ -36,3 +36,16 @@ export function requestIsTooLarge(request: Request) {
     contentLength > MAX_DATABASE_FILE_SIZE + MULTIPART_OVERHEAD_ALLOWANCE
   );
 }
+
+export function getMimeTypeByExtension(filename: string): string | null {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".doc") return "application/msword";
+  if (ext === ".docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".png") return "image/png";
+  if (ext === ".gif") return "image/gif";
+  if (ext === ".webp") return "image/webp";
+  return null;
+}
+

@@ -1,5 +1,6 @@
 import type {
   ExplorerItem,
+  AchievementSignal,
   SafeBlog,
   SafeCaseStudy,
   SafeDashboard,
@@ -607,6 +608,45 @@ export const safeCertifications: CertificationSignal[] = [
     title: "AWS Certified Cloud Practitioner",
     issuer: "Amazon Web Services",
     issuedAt: new Date("2025-04-12")
+  }
+];
+
+export const safeAchievements: AchievementSignal[] = [
+  {
+    title: "NCC Cadet Sergeant",
+    issuer: "National Cadet Corps",
+    category: "Leadership",
+    summary:
+      "Led junior cadets, coordinated soft-skills and theory sessions, and represented the unit in rifle shooting up to Pre-IGC camp.",
+    awardedAt: new Date("2023-01-01"),
+    imageRatio: "4/3",
+    highlighted: true,
+    sortOrder: 1,
+    publishedAt: "2023-01-01"
+  },
+  {
+    title: "Entrepreneurship Development Cell Coordinator",
+    issuer: "Veltech Multitech",
+    category: "Entrepreneurship",
+    summary:
+      "Coordinated customer-expectation cohorts, business design pitching, and college-level entrepreneurship events.",
+    awardedAt: new Date("2024-01-01"),
+    imageRatio: "4/3",
+    highlighted: true,
+    sortOrder: 2,
+    publishedAt: "2024-01-01"
+  },
+  {
+    title: "Google Data Analytics Professional Certificate",
+    issuer: "Coursera / Google",
+    category: "Certification",
+    summary:
+      "Credential signal for analytics foundations that support the portfolio's data science, dashboard, and AI evaluation work.",
+    awardedAt: new Date("2023-09-10"),
+    imageRatio: "4/3",
+    highlighted: false,
+    sortOrder: 3,
+    publishedAt: "2023-09-10"
   }
 ];
 

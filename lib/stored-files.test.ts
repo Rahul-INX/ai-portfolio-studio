@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getMimeTypeByExtension,
   MAX_DATABASE_FILE_SIZE,
   requestIsTooLarge,
   safeFileName,
@@ -20,4 +21,10 @@ test("rejects requests that exceed file size plus multipart overhead", () => {
     headers: { "content-length": String(MAX_DATABASE_FILE_SIZE + 200_000) },
   });
   assert.equal(requestIsTooLarge(request), true);
+});
+
+test("infers supported mime types from file extensions", () => {
+  assert.equal(getMimeTypeByExtension("demo.DOCX"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  assert.equal(getMimeTypeByExtension("cover.jpeg"), "image/jpeg");
+  assert.equal(getMimeTypeByExtension("archive.bin"), null);
 });

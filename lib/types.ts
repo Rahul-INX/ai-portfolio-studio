@@ -13,6 +13,7 @@ export type ArchitectureCanvas = {
 };
 
 export type SafeProject = {
+  id?: string;
   kind: "project";
   slug: string;
   title: string;
@@ -35,6 +36,7 @@ export type SafeProject = {
 };
 
 export type SafeCaseStudy = {
+  id?: string;
   kind: "case-study";
   slug: string;
   title: string;
@@ -49,6 +51,7 @@ export type SafeCaseStudy = {
 };
 
 export type SafeExperiment = {
+  id?: string;
   kind: "experiment";
   slug: string;
   title: string;
@@ -65,6 +68,7 @@ export type SafeExperiment = {
 };
 
 export type SafeBlog = {
+  id?: string;
   kind: "blog";
   slug: string;
   title: string;
@@ -79,6 +83,7 @@ export type SafeBlog = {
 };
 
 export type SafeDashboard = {
+  id?: string;
   kind: "dashboard";
   slug: string;
   title: string;
@@ -92,6 +97,7 @@ export type SafeDashboard = {
 export type ExplorerItem = SafeProject | SafeCaseStudy | SafeExperiment | SafeBlog | SafeDashboard;
 
 export type TimelineItem = {
+  id?: string;
   title: string;
   period: string;
   description: string;
@@ -100,6 +106,7 @@ export type TimelineItem = {
 };
 
 export type SkillSignal = {
+  id?: string;
   name: string;
   category: string;
   level: number;
@@ -107,10 +114,27 @@ export type SkillSignal = {
 };
 
 export type CertificationSignal = {
+  id?: string;
   title: string;
   issuer: string;
   issuedAt?: Date | string | null;
   url?: string | null;
+};
+
+export type AchievementSignal = {
+  id?: string;
+  title: string;
+  issuer: string;
+  category: string;
+  summary: string;
+  awardedAt?: Date | string | null;
+  proofUrl?: string | null;
+  imageUrl?: string | null;
+  imageRatio: "1/1" | "4/3" | "16/9";
+  imageFocus?: string | null;
+  highlighted: boolean;
+  sortOrder: number;
+  publishedAt?: Date | string | null;
 };
 
 export type PortfolioDocumentKind = "RESUME" | "CV";

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { Database, FileDown, FileText, FlaskConical, LayoutDashboard, PenTool, Workflow } from "lucide-react";
+import { Award, Database, FileDown, FileText, FlaskConical, LayoutDashboard, PenTool, Workflow } from "lucide-react";
 import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { JobFitSettingsForm } from "@/components/job-fit-settings-form";
 import { SiteShell } from "@/components/site-shell";
@@ -21,6 +21,7 @@ const modules = [
   { label: "Experiments", icon: FlaskConical, detail: "RAG, vector DB, LLM benchmarks, extraction notes" },
   { label: "Blogs", icon: PenTool, detail: "Markdown articles, SEO fields, syntax highlighting" },
   { label: "Dashboards", icon: LayoutDashboard, detail: "Power BI, Streamlit, analytics galleries" },
+  { label: "Achievements", icon: Award, detail: "Awards, leadership signals, proof links, images" },
   { label: "Resume", icon: Database, detail: "Skills, certifications, timeline" },
   { label: "Documents", icon: FileDown, detail: "Resume and CV downloads" }
 ];

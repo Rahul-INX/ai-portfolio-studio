@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
+  getMimeTypeByExtension,
   IMAGE_TYPES,
   MAX_DATABASE_FILE_SIZE,
   requestIsTooLarge,
@@ -41,17 +42,23 @@ export async function POST(request: Request) {
     if (file.size > MAX_DATABASE_FILE_SIZE) {
       return errorResponse("Image exceeds 4 MB limit.", 413);
     }
-    if (!IMAGE_TYPES.has(file.type)) {
-      return errorResponse(
-        "Unsupported image type. Upload JPEG, PNG, GIF, or WebP.",
-        415,
-      );
+    let fileType = file.type;
+    if (!IMAGE_TYPES.has(fileType)) {
+      const fallbackMime = getMimeTypeByExtension(file.name);
+      if (fallbackMime && IMAGE_TYPES.has(fallbackMime)) {
+        fileType = fallbackMime;
+      } else {
+        return errorResponse(
+          "Unsupported image type. Upload JPEG, PNG, GIF, or WebP.",
+          415,
+        );
+      }
     }
 
     const stored = await prisma.storedFile.create({
       data: {
         fileName: safeFileName(file.name, "portfolio-image"),
-        contentType: file.type,
+        contentType: fileType,
         size: file.size,
         data: Buffer.from(await file.arrayBuffer()),
       },

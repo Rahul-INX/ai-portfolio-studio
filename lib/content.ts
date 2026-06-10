@@ -30,6 +30,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
 import { prisma } from "@/lib/prisma";
 import {
   allSafeItems,
+  safeAchievements,
   safeBlogs,
   safeCaseStudies,
   safeCertifications,
@@ -43,6 +44,7 @@ import {
 } from "@/lib/safe-content";
 import type {
   ArchitectureCanvas,
+  AchievementSignal,
   ExplorerItem,
   Metric,
   PortfolioDocument,
@@ -53,6 +55,43 @@ import type {
   SafeProject,
   SiteProfile
 } from "@/lib/types";
+
+type AchievementRow = {
+  id: string;
+  title: string;
+  issuer: string;
+  category: string;
+  summary: string;
+  awardedAt: Date | string | null;
+  proofUrl: string | null;
+  imageUrl: string | null;
+  imageRatio: string | null;
+  highlighted: boolean;
+  sortOrder: number;
+  publishedAt: Date | string | null;
+};
+
+function achievementClient() {
+  return (prisma as typeof prisma & { achievement?: {
+    findMany: typeof prisma.achievement extends undefined ? never : typeof prisma.achievement.findMany;
+  } }).achievement;
+}
+
+async function queryAchievements(): Promise<AchievementRow[]> {
+  const model = achievementClient();
+  if (model) return model.findMany({
+    where: { visibility: "PUBLISHED" },
+    orderBy: [{ highlighted: "desc" }, { sortOrder: "asc" }, { awardedAt: "desc" }]
+  }) as Promise<AchievementRow[]>;
+  return prisma.$queryRaw<AchievementRow[]>`
+    SELECT
+      id, title, issuer, category, summary, "awardedAt", "proofUrl", "imageUrl", "imageRatio",
+      highlighted, "sortOrder", "publishedAt"
+    FROM "Achievement"
+    WHERE visibility = 'PUBLISHED'
+    ORDER BY highlighted DESC, "sortOrder" ASC, "awardedAt" DESC
+  `;
+}
 
 export const getSiteProfile = cache(async (): Promise<SiteProfile> => {
   if (!canReadDatabase()) return safeSiteProfile;
@@ -86,6 +125,7 @@ export const getProjects = cache(async (): Promise<SafeProject[]> => {
       })
     );
     return rows.map((row) => ({
+      id: row.id,
       kind: "project",
       slug: row.slug,
       title: row.title,
@@ -122,6 +162,7 @@ export const getCaseStudies = cache(async (): Promise<SafeCaseStudy[]> => {
       })
     );
     return rows.map((row) => ({
+      id: row.id,
       kind: "case-study",
       slug: row.slug,
       title: row.title,
@@ -150,6 +191,7 @@ export const getExperiments = cache(async (): Promise<SafeExperiment[]> => {
       })
     );
     return rows.map((row) => ({
+      id: row.id,
       kind: "experiment",
       slug: row.slug,
       title: row.title,
@@ -180,6 +222,7 @@ export const getBlogs = cache(async (): Promise<SafeBlog[]> => {
       })
     );
     return rows.map((row) => ({
+      id: row.id,
       kind: "blog",
       slug: row.slug,
       title: row.title,
@@ -208,6 +251,7 @@ export const getDashboards = cache(async (): Promise<SafeDashboard[]> => {
       })
     );
     return rows.map((row) => ({
+      id: row.id,
       kind: "dashboard",
       slug: row.slug,
       title: row.title,
@@ -239,7 +283,15 @@ export const getSkills = cache(async () => {
   if (!canReadDatabase()) return safeSkills;
   try {
     const rows = await withRetry(() => prisma.skill.findMany({ orderBy: [{ category: "asc" }, { level: "desc" }] }));
-    return rows.length ? rows : safeSkills;
+    return rows.length
+      ? rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          level: row.level,
+          weight: row.weight
+        }))
+      : safeSkills;
   } catch (error) {
     markDatabaseUnavailable(error);
     return safeSkills;
@@ -250,7 +302,16 @@ export const getTimeline = cache(async () => {
   if (!canReadDatabase()) return safeTimeline;
   try {
     const rows = await withRetry(() => prisma.timelineEvent.findMany({ orderBy: { sortOrder: "asc" } }));
-    return rows.length ? rows : safeTimeline;
+    return rows.length
+      ? rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          period: row.period,
+          description: row.description,
+          signal: row.signal,
+          sortOrder: row.sortOrder
+        }))
+      : safeTimeline;
   } catch (error) {
     markDatabaseUnavailable(error);
     return safeTimeline;
@@ -261,10 +322,44 @@ export const getCertifications = cache(async () => {
   if (!canReadDatabase()) return safeCertifications;
   try {
     const rows = await withRetry(() => prisma.certification.findMany({ orderBy: { issuedAt: "desc" } }));
-    return rows.length ? rows : safeCertifications;
+    return rows.length
+      ? rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          issuer: row.issuer,
+          issuedAt: row.issuedAt,
+          url: row.url
+        }))
+      : safeCertifications;
   } catch (error) {
     markDatabaseUnavailable(error);
     return safeCertifications;
+  }
+});
+
+export const getAchievements = cache(async (): Promise<AchievementSignal[]> => {
+  if (!canReadDatabase()) return safeAchievements;
+  try {
+    const rows = await withRetry(() => queryAchievements());
+    return rows.length
+      ? rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          issuer: row.issuer,
+          category: row.category,
+          summary: row.summary,
+          awardedAt: row.awardedAt,
+          proofUrl: row.proofUrl,
+          imageUrl: row.imageUrl,
+          imageRatio: row.imageRatio === "1/1" || row.imageRatio === "16/9" ? row.imageRatio : "4/3",
+          highlighted: row.highlighted,
+          sortOrder: row.sortOrder,
+          publishedAt: row.publishedAt instanceof Date ? row.publishedAt.toISOString() : row.publishedAt ?? undefined
+        }))
+      : safeAchievements;
+  } catch (error) {
+    markDatabaseUnavailable(error);
+    return safeAchievements;
   }
 });
 

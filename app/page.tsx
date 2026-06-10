@@ -8,7 +8,8 @@ import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
 import { EditableHero } from "@/components/editable-hero";
-import { getExplorerItems, getProjects, getSiteProfile, getSkills } from "@/lib/content";
+import { EditableAchievements } from "@/components/editable-achievements";
+import { getAchievements, getExplorerItems, getProjects, getSiteProfile, getSkills } from "@/lib/content";
 
 export default async function HomePage() {
   // Fetch sequentially to avoid exhausting Neon's connection pool.
@@ -17,6 +18,7 @@ export default async function HomePage() {
   const projects = await getProjects();
   const items = await getExplorerItems();
   const skills = await getSkills();
+  const achievements = await getAchievements();
   const featured = projects.filter((project) => project.featured).slice(0, 2);
   const recent = items.slice(0, 4);
 
@@ -109,6 +111,19 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="awards-achievements" className="border-b hairline">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <SectionHeading
+            eyebrow="Awards and achievements"
+            title="Editable proof signals that support the GenAI engineering story."
+            description="Awards, credentials, leadership signals, and milestone proof live on the page itself in edit mode, so you can update them where they are reviewed."
+          />
+          <div className="mt-9">
+            <EditableAchievements items={achievements} />
           </div>
         </div>
       </section>

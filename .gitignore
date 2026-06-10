@@ -87,3 +87,4 @@ public/uploads/
 # OS
 .DS_Store
 Thumbs.db
+prisma/migrations/20260609180000_add_achievements/

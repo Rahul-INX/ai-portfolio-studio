@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const baseSchema = z.object({
-  kind: z.enum(["project", "case-study", "experiment", "blog", "dashboard", "skill", "certification", "timeline", "document"]),
+  id: z.string().optional(),
+  kind: z.enum(["project", "case-study", "experiment", "blog", "dashboard", "skill", "certification", "achievement", "timeline", "document"]),
   title: z.string().min(3),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/),
   tags: z.array(z.string()).default([])
@@ -104,6 +105,22 @@ const certificationSchema = z.object({
   url: z.string().url().optional().or(z.literal(""))
 });
 
+const achievementSchema = z.object({
+  id: z.string().optional(),
+  kind: z.literal("achievement"),
+  title: z.string().min(3),
+  issuer: z.string().min(2),
+  category: z.string().min(2),
+  summary: z.string().min(10),
+  awardedAt: z.string().optional().or(z.literal("")),
+  proofUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: optionalImageSchema,
+  imageRatio: z.enum(["1/1", "4/3", "16/9"]).default("4/3"),
+  imageFocus: z.string().default("50% 50%"),
+  highlighted: z.boolean().default(false),
+  sortOrder: z.number().int().min(0).default(0)
+});
+
 const timelineSchema = z.object({
   id: z.string().optional(),
   kind: z.literal("timeline"),
@@ -174,15 +191,19 @@ const contentSchema = z.discriminatedUnion("kind", [
   dashboardSchema,
   skillSchemaWithId,
   certificationSchemaWithId,
+  achievementSchema,
   timelineSchema,
   documentSchema,
   siteProfileSchema
 ]);
 
-function publishedResponse(item: unknown, kind: EditableContentKind, slug?: string) {
-  const paths = affectedContentPaths(kind, slug);
+function publishedResponse(item: unknown, kind: EditableContentKind, slug?: string, oldSlug?: string) {
+  const paths = [
+    ...affectedContentPaths(kind, slug),
+    ...(oldSlug ? affectedContentPaths(kind, oldSlug) : [])
+  ];
   const revalidationErrors: string[] = [];
-  for (const path of [...paths, "/admin", "/admin/new-project"]) {
+  for (const path of [...new Set(paths), "/admin", "/admin/new-project"]) {
     try {
       revalidatePath(path);
     } catch (error) {
@@ -222,7 +243,7 @@ async function publishContent(request: Request) {
   }
 
   if (parsed.data.kind === "project") {
-    const { kind: _kind, imageUrl, startDate, endDate, githubUrl, demoUrl, ...data } = parsed.data;
+    const { kind: _kind, id, imageUrl, startDate, endDate, githubUrl, demoUrl, ...data } = parsed.data;
     void _kind;
     const published = {
       ...data,
@@ -234,48 +255,76 @@ async function publishContent(request: Request) {
       visibility: "PUBLISHED" as const,
       publishedAt: new Date()
     };
-    const project = await prisma.project.upsert({
-      where: { slug: data.slug },
-      update: published,
-      create: published
-    });
-    return publishedResponse(project, "project", data.slug);
+    let oldSlug: string | undefined;
+    if (id) {
+      const existing = await prisma.project.findUnique({ where: { id }, select: { slug: true } });
+      oldSlug = existing?.slug;
+    }
+    const project = id
+      ? await prisma.project.update({ where: { id }, data: published })
+      : await prisma.project.upsert({
+          where: { slug: data.slug },
+          update: published,
+          create: published
+        });
+    return publishedResponse(project, "project", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "case-study") {
-    const { kind: _kind, imageUrl, ...data } = parsed.data;
+    const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
     const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
-    const caseStudy = await prisma.caseStudy.upsert({
-      where: { slug: data.slug },
-      update: published,
-      create: published
-    });
-    return publishedResponse(caseStudy, "case-study", data.slug);
+    let oldSlug: string | undefined;
+    if (id) {
+      const existing = await prisma.caseStudy.findUnique({ where: { id }, select: { slug: true } });
+      oldSlug = existing?.slug;
+    }
+    const caseStudy = id
+      ? await prisma.caseStudy.update({ where: { id }, data: published })
+      : await prisma.caseStudy.upsert({
+          where: { slug: data.slug },
+          update: published,
+          create: published
+        });
+    return publishedResponse(caseStudy, "case-study", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "experiment") {
-    const { kind: _kind, imageUrl, ...data } = parsed.data;
+    const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
     const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
-    const experiment = await prisma.experiment.upsert({
-      where: { slug: data.slug },
-      update: published,
-      create: published
-    });
-    return publishedResponse(experiment, "experiment", data.slug);
+    let oldSlug: string | undefined;
+    if (id) {
+      const existing = await prisma.experiment.findUnique({ where: { id }, select: { slug: true } });
+      oldSlug = existing?.slug;
+    }
+    const experiment = id
+      ? await prisma.experiment.update({ where: { id }, data: published })
+      : await prisma.experiment.upsert({
+          where: { slug: data.slug },
+          update: published,
+          create: published
+        });
+    return publishedResponse(experiment, "experiment", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "blog") {
-    const { kind: _kind, imageUrl, ...data } = parsed.data;
+    const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
     const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
-    const blog = await prisma.blog.upsert({
-      where: { slug: data.slug },
-      update: published,
-      create: published
-    });
-    return publishedResponse(blog, "blog", data.slug);
+    let oldSlug: string | undefined;
+    if (id) {
+      const existing = await prisma.blog.findUnique({ where: { id }, select: { slug: true } });
+      oldSlug = existing?.slug;
+    }
+    const blog = id
+      ? await prisma.blog.update({ where: { id }, data: published })
+      : await prisma.blog.upsert({
+          where: { slug: data.slug },
+          update: published,
+          create: published
+        });
+    return publishedResponse(blog, "blog", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "skill") {
@@ -297,6 +346,24 @@ async function publishContent(request: Request) {
       ? await prisma.certification.update({ where: { id }, data: certificationData })
       : await prisma.certification.create({ data: certificationData });
     return publishedResponse(certification, "certification");
+  }
+
+  if (parsed.data.kind === "achievement") {
+    const { kind: _kind, id, awardedAt, proofUrl, imageUrl, imageFocus, ...data } = parsed.data;
+    void _kind;
+    const achievementData = {
+      ...data,
+      awardedAt: awardedAt ? new Date(awardedAt) : null,
+      proofUrl: proofUrl || null,
+      imageUrl: imageUrl || null,
+      imageFocus: imageFocus || "50% 50%",
+      visibility: "PUBLISHED" as const,
+      publishedAt: new Date()
+    };
+    const achievement = id
+      ? await prisma.achievement.update({ where: { id }, data: achievementData })
+      : await prisma.achievement.create({ data: achievementData });
+    return publishedResponse(achievement, "achievement");
   }
 
   if (parsed.data.kind === "timeline") {
@@ -358,24 +425,38 @@ async function publishContent(request: Request) {
     return publishedResponse(profile, "site-profile");
   }
 
-  const { kind: _kind, ...data } = parsed.data;
+  const { kind: _kind, id, ...data } = parsed.data;
   void _kind;
   const published = { ...data, visibility: "PUBLISHED" as const, publishedAt: new Date() };
-  const dashboard = await prisma.dashboard.upsert({
-    where: { slug: data.slug },
-    update: {
-      ...published,
-      embedUrl: published.embedUrl || null,
-      imageUrl: published.imageUrl || null
-    },
-    create: {
-      ...published,
-      embedUrl: published.embedUrl || null,
-      imageUrl: published.imageUrl || null
-    }
-  });
+  let oldSlug: string | undefined;
+  if (id) {
+    const existing = await prisma.dashboard.findUnique({ where: { id }, select: { slug: true } });
+    oldSlug = existing?.slug;
+  }
+  const dashboard = id
+    ? await prisma.dashboard.update({
+        where: { id },
+        data: {
+          ...published,
+          embedUrl: published.embedUrl || null,
+          imageUrl: published.imageUrl || null
+        }
+      })
+    : await prisma.dashboard.upsert({
+        where: { slug: data.slug },
+        update: {
+          ...published,
+          embedUrl: published.embedUrl || null,
+          imageUrl: published.imageUrl || null
+        },
+        create: {
+          ...published,
+          embedUrl: published.embedUrl || null,
+          imageUrl: published.imageUrl || null
+        }
+      });
 
-  return publishedResponse(dashboard, "dashboard", data.slug);
+  return publishedResponse(dashboard, "dashboard", data.slug, oldSlug);
 }
 
 function isDatabaseUnavailable(error: unknown) {
@@ -422,7 +503,70 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "Failed to publish content.",
-        message: "The server could not save the content.",
+        message: error instanceof Error ? error.message : "The server could not save the content.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const requestId = crypto.randomUUID();
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ error: "DATABASE_URL is required for CMS deletes." }, { status: 503 });
+    }
+
+    const body = await request.json();
+    const { kind, id } = z.object({
+      kind: z.enum(["project", "case-study", "experiment", "blog", "dashboard", "skill", "certification", "achievement", "timeline"]),
+      id: z.string().min(1)
+    }).parse(body);
+
+    let slug: string | undefined;
+    if (["project", "case-study", "experiment", "blog", "dashboard"].includes(kind)) {
+      const prismaProp = kind === "case-study" ? "caseStudy" : kind;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existing = await (prisma[prismaProp as keyof typeof prisma] as any).findUnique({
+        where: { id },
+        select: { slug: true }
+      });
+      slug = existing?.slug;
+    }
+
+    let deletedItem;
+    if (kind === "project") {
+      deletedItem = await prisma.project.delete({ where: { id } });
+    } else if (kind === "case-study") {
+      deletedItem = await prisma.caseStudy.delete({ where: { id } });
+    } else if (kind === "experiment") {
+      deletedItem = await prisma.experiment.delete({ where: { id } });
+    } else if (kind === "blog") {
+      deletedItem = await prisma.blog.delete({ where: { id } });
+    } else if (kind === "dashboard") {
+      deletedItem = await prisma.dashboard.delete({ where: { id } });
+    } else if (kind === "skill") {
+      deletedItem = await prisma.skill.delete({ where: { id } });
+    } else if (kind === "certification") {
+      deletedItem = await prisma.certification.delete({ where: { id } });
+    } else if (kind === "achievement") {
+      deletedItem = await prisma.achievement.delete({ where: { id } });
+    } else if (kind === "timeline") {
+      deletedItem = await prisma.timelineEvent.delete({ where: { id } });
+    }
+
+    return publishedResponse(deletedItem, kind, slug);
+  } catch (error) {
+    console.error(`[content:${requestId}] Delete failed`, error);
+    return NextResponse.json(
+      {
+        error: "Failed to delete content.",
+        message: error instanceof Error ? error.message : "The server could not delete the content.",
         requestId,
       },
       { status: 500 },

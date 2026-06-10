@@ -7,6 +7,7 @@ import { SiteShell } from "@/components/site-shell";
 import { authOptions } from "@/lib/auth";
 import {
   getBlogs,
+  getAchievements,
   getCaseStudies,
   getCertifications,
   getDashboards,
@@ -35,6 +36,7 @@ export default async function NewProjectPage() {
   const dashboards = await getDashboards();
   const skills = await getSkills();
   const certifications = await getCertifications();
+  const achievements = await getAchievements();
   const timeline = await getTimeline();
   const documents = await getPortfolioDocuments();
   return (
@@ -51,7 +53,7 @@ export default async function NewProjectPage() {
           Use live-page editing for common changes. This studio remains available for blogs, structured records, uploads, bulk work, and recovery.
         </p>
         <ContentStudioForm
-          data={{ profile, projects, caseStudies, experiments, blogs, dashboards, skills, certifications, timeline, documents }}
+          data={{ profile, projects, caseStudies, experiments, blogs, dashboards, skills, certifications, achievements, timeline, documents }}
         />
       </section>
     </SiteShell>

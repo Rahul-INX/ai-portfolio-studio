@@ -192,6 +192,27 @@ model Certification {
   updatedAt DateTime @updatedAt
 }
 
+model Achievement {
+  id          String     @id @default(cuid())
+  title       String
+  issuer      String
+  category    String
+  summary     String
+  awardedAt   DateTime?
+  proofUrl    String?
+  imageUrl    String?
+  imageRatio  String     @default("4/3")
+  imageFocus  String     @default("50% 50%")
+  highlighted Boolean    @default(false)
+  sortOrder   Int        @default(0)
+  visibility  Visibility @default(PUBLISHED)
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([visibility, highlighted, sortOrder])
+}
+
 model TimelineEvent {
   id          String   @id @default(cuid())
   title       String
