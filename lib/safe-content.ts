@@ -44,6 +44,10 @@ export const safeSiteProfile: SiteProfile = {
   timelineTitle: "From computer science foundations to applied GenAI and data-product engineering.",
   timelineDescription:
     "A structured view of education, leadership, ML projects, RAG systems, and the current focus on production-minded AI tooling.",
+  awardsEyebrow: "Awards and achievements",
+  awardsTitle: "Proof signals that support the GenAI engineering story.",
+  awardsDescription:
+    "Awards, credentials, leadership signals, and milestone proof live on the page itself in edit mode, so you can update them where they are reviewed.",
   adminEyebrow: "Admin CMS",
   adminTitle: "Editable portfolio control center",
   adminDescription:

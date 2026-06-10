@@ -117,14 +117,7 @@ export default async function HomePage() {
 
       <section id="awards-achievements" className="border-b hairline">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <SectionHeading
-            eyebrow="Awards and achievements"
-            title="Editable proof signals that support the GenAI engineering story."
-            description="Awards, credentials, leadership signals, and milestone proof live on the page itself in edit mode, so you can update them where they are reviewed."
-          />
-          <div className="mt-9">
-            <EditableAchievements items={achievements} />
-          </div>
+          <EditableAchievements items={achievements} profile={profile} />
         </div>
       </section>
 

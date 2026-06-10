@@ -265,6 +265,9 @@ model SiteProfile {
   timelineEyebrow     String
   timelineTitle       String
   timelineDescription String
+  awardsEyebrow       String   @default("Awards and achievements")
+  awardsTitle         String   @default("Proof signals that support the engineering story.")
+  awardsDescription   String   @default("Awards, credentials, leadership signals, and milestone proof live on the page itself in edit mode, so you can update them where they are reviewed.")
   adminEyebrow        String
   adminTitle          String
   adminDescription    String

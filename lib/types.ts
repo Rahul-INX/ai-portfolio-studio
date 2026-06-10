@@ -177,6 +177,9 @@ export type SiteProfile = {
   timelineEyebrow: string;
   timelineTitle: string;
   timelineDescription: string;
+  awardsEyebrow: string;
+  awardsTitle: string;
+  awardsDescription: string;
   adminEyebrow: string;
   adminTitle: string;
   adminDescription: string;
