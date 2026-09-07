@@ -4,7 +4,7 @@
 
 Can the owner connect a Google Drive account so the CMS creates and manages one structured media library, stores uploaded images/documents there instead of Neon `StoredFile.data`, and permits substantially larger uploads?
 
-Implementation is complete locally and this record remains the single scope ledger. The owner connected Google Drive through OAuth and verified the private managed library. Production cutover remains pending because the deployed app does not yet contain the Drive media routes or OAuth environment.
+Implementation and production cutover are complete. The owner connected Google Drive through OAuth, the private managed library is verified, all portfolio media references now use Drive-backed routes, and Neon no longer stores media bytes.
 
 ## Evidence
 
@@ -106,9 +106,9 @@ The app creates the root and fixed children idempotently on first successful con
 - [x] Explicit batch migration and cleanup workflow implemented: parent/size verification, URL rewrite, then individual Neon deletion; failed files remain in Neon.
 - [x] Local validation: TypeScript, 44 unit tests, production build, and whitespace diff check passed.
 - [x] Local Google OAuth connection and complete Drive source copy verified.
-- [ ] Production cutover and final Neon blob cleanup — pending deployment of the Drive routes and Google OAuth settings to Vercel.
+- [x] Production cutover and final Neon blob cleanup completed and verified.
 
-The implementation is ready locally. All eight current media originals are verified in Drive, while eight temporary PostgreSQL compatibility copies keep the older deployed build working. Final cutover requires deploying the Drive routes and production OAuth environment, verifying live `/api/media` delivery, switching references to the existing Drive assets, and only then deleting the temporary copies.
+The live portfolio now uses eight private Google Drive originals through stable `/api/media/:id` routes. Neon retains portfolio records and Drive metadata but contains zero `StoredFile` rows and zero media bytes.
 
 ### Implementation log
 
@@ -122,4 +122,6 @@ The implementation is ready locally. All eight current media originals are verif
 - 2026-09-07: Updated repository setup documentation to describe private Drive storage, exact local/production OAuth callback configuration, resumable 100 MB uploads, encrypted token storage, and the deploy-before-migrate safety boundary.
 - 2026-09-07: Revalidated the cutover boundary after Google settings were saved: typecheck, all 44 tests, production build, and diff check pass; Neon currently holds eight temporary compatibility files (5,900,030 bytes) matching eight active Drive originals. Local Drive admin routing returns authenticated JSON, while the live deployment still returns its HTML 404 for both Drive admin and media routes, so production migration and Neon deletion remain unsafe until deployment is authorized and completed.
 - 2026-09-07: Owner authorized production deployment and final cutover. Added byte-identical Drive-asset reuse so the eight temporary Neon copies relink to their existing originals rather than creating duplicates; all eight real pairs matched. Release validation passes: typecheck, 45 unit tests, production build, staged secret scan, and 115 browser checks with two intentional duplicate-viewport skips. Fixed the discovered light-theme contrast issue and serialized stateful browser execution against shared Neon.
-- 2026-09-07: Prepared the release commit, but GitHub rejected both the machine account and the owner PAT with HTTP 403; no production deployment started. The temporary repository-local credential and SSH host file were removed. Drive references and the eight Neon compatibility blobs remain unchanged until a write-capable repository credential is supplied.
+- 2026-09-07: Initial CLI push attempts were rejected, so the authenticated GitHub App published the exact verified local tree without using the replacement PAT. Vercel deployed commit `d6d65e3` successfully and the live Drive routes are active. Authenticated production verification reports `configured=false` and a real Drive asset returns 503 because the production Google OAuth/encryption variables are not yet present. Drive references and all eight Neon compatibility blobs remain unchanged.
+- 2026-09-08: Confirmed all four Drive/encryption variables are scoped to Vercel Production and redeployed commit `d6d65e3`. Authenticated production checks report `configured=true` and `connected=true`; token refresh verification passes and a real Drive asset returns its exact expected MIME type and byte count.
+- 2026-09-08: Completed the guarded cutover. Neon now has zero `StoredFile` rows and zero stored media bytes; `VACUUM (ANALYZE)` confirms zero live/dead blob rows. Drive retains eight active, referenced originals totaling 5,900,030 bytes with no duplicates or trashed assets. All eight live media routes returned HTTP 200 with exact expected sizes and types. A crawl of all 25 published/static routes found no HTTP failures, console errors, overflow, or broken media after allowing the one lazy-loaded timeline portrait to load; the authenticated CMS visually reports zero legacy Neon media.
