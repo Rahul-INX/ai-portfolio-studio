@@ -50,6 +50,12 @@ __pycache__/
 # local data
 Data/
 docs/
+!docs/
+docs/*
+!docs/work/
+docs/work/*
+!docs/work/portfolio-product-audit.md
+!docs/work/google-drive-media-feasibility.md
 # Dependencies
 node_modules/
 
@@ -88,3 +94,6 @@ public/uploads/
 .DS_Store
 Thumbs.db
 prisma/migrations/20260609180000_add_achievements/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

@@ -6,6 +6,7 @@ import {
   type JobFitResult
 } from "@/lib/job-fit";
 import type { ContextEvidence } from "@/lib/site-context";
+import { ProviderCallError, runTextWithFallback } from "@/lib/ai-providers";
 import { z } from "zod";
 
 export const resumeMatchAgent = {
@@ -35,6 +36,7 @@ export type ResumeMatchAgentRun =
         | "invalid-schema"
         | "ungrounded-output"
         | "timeout"
+        | "rate-limit"
         | "unexpected-error";
       detail?: string;
     };
@@ -137,24 +139,15 @@ export function resumeMatchOutputJsonSchema() {
 
 export function createResumeMatchRequestBody(ownerName: string, jdText: string, evidenceText: string) {
   return {
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    temperature: 0.1,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "resume_match_result",
-        description: "A concise, evidence-grounded recruiter role-fit brief.",
-        strict: true,
-        schema: resumeMatchOutputJsonSchema()
-      }
-    },
-    messages: [
-      { role: "system", content: agentInstructions(ownerName, jdText) },
-      {
-        role: "user",
-        content: `Job description:\n${jdText}\n\nAllowed portfolio evidence:\n${evidenceText}`
-      }
-    ]
+    contents: [{
+      role: "user",
+      parts: [{ text: `${agentInstructions(ownerName, jdText)}\n\nJob description:\n${jdText}\n\nAllowed portfolio evidence:\n${evidenceText}` }]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json",
+      responseSchema: resumeMatchOutputJsonSchema()
+    }
   };
 }
 
@@ -219,47 +212,22 @@ export async function runResumeMatchAgent({
   evidenceText,
   timeoutMs
 }: ResumeMatchAgentInput): Promise<ResumeMatchAgentRun> {
-  if (!process.env.OPENAI_API_KEY) return { ok: false, reason: "missing-api-key" };
-
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(timeoutMs),
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(createResumeMatchRequestBody(ownerName, jdText, evidenceText))
+    const response = await runTextWithFallback({
+      system: agentInstructions(ownerName, jdText),
+      messages: [{
+        role: "user",
+        content: `Job description:\n${jdText}\n\nAllowed portfolio evidence:\n${evidenceText}`,
+      }],
+      temperature: 0.1,
+      jsonSchema: resumeMatchOutputJsonSchema(),
+      timeoutMs,
+      enforceQuota: true,
     });
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
-      return {
-        ok: false,
-        reason: "provider-error",
-        detail: payload?.error?.code ?? `HTTP ${response.status}`
-      };
-    }
-
-    const payload = (await response.json()) as {
-      choices?: Array<{
-        finish_reason?: string;
-        message?: { content?: string; refusal?: string };
-      }>;
-    };
-    const choice = payload.choices?.[0];
-    if (choice?.message?.refusal) {
-      return { ok: false, reason: "refusal", detail: choice.message.refusal };
-    }
-    if (choice?.finish_reason && choice.finish_reason !== "stop") {
-      return { ok: false, reason: "incomplete-response", detail: choice.finish_reason };
-    }
-    const content = choice?.message?.content;
-    if (!content) return { ok: false, reason: "empty-response" };
 
     let rawResult: unknown;
     try {
-      rawResult = normalizeAgentResult(JSON.parse(content), jdText);
+      rawResult = normalizeAgentResult(JSON.parse(response.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")), jdText);
     } catch {
       return { ok: false, reason: "invalid-json" };
     }
@@ -278,6 +246,9 @@ export async function runResumeMatchAgent({
       ? { ok: true, result }
       : { ok: false, reason: "ungrounded-output" };
   } catch (error) {
+    if (error instanceof ProviderCallError) {
+      return { ok: false, reason: error.reason, detail: error.message };
+    }
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
       return { ok: false, reason: "timeout" };
     }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { getSiteProfile } from "@/lib/content";
+import { safeSiteProfile } from "@/lib/safe-content";
 import "./globals.css";
 
 export const revalidate = 300;
@@ -65,14 +66,16 @@ export const viewport: Viewport = {
 const themeScript = `
   try {
     const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (stored === "dark" || (!stored && prefersDark)) document.documentElement.classList.add("dark");
+    if (stored === "dark") document.documentElement.classList.add("dark");
   } catch {}
 `;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="description" content={safeSiteProfile.seoDescription} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         <Script id="theme-script" strategy="beforeInteractive">
           {themeScript}

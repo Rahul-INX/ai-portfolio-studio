@@ -32,6 +32,17 @@ enum DocumentKind {
   CV
 }
 
+enum AiProviderType {
+  GEMINI
+  OPENAI
+  ANTHROPIC
+  XAI
+}
+
+enum MediaProvider {
+  GOOGLE_DRIVE
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -383,4 +394,72 @@ model StoredFile {
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model DriveConnection {
+  id             String   @id @default("main")
+  accountEmail   String?
+  encryptedValue String
+  iv             String
+  authTag        String
+  rootFolderId   String
+  folderIds      Json
+  connectedAt    DateTime @default(now())
+  lastVerifiedAt DateTime?
+  updatedAt      DateTime @updatedAt
+}
+
+model MediaAsset {
+  id          String        @id @default(cuid())
+  provider    MediaProvider @default(GOOGLE_DRIVE)
+  externalId  String        @unique
+  fileName    String
+  contentType String
+  size        Int
+  folder      String
+  createdAt   DateTime      @default(now())
+  trashedAt   DateTime?
+
+  @@index([folder, createdAt])
+}
+
+model AiProviderConfig {
+  id                String         @id @default(cuid())
+  provider          AiProviderType @unique
+  enabled           Boolean        @default(false)
+  priority          Int
+  selectedModel     String?
+  maxOutputTokens   Int            @default(1200)
+  dailyRequestLimit Int            @default(100)
+  keys              AiApiKey[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model AiApiKey {
+  id             String           @id @default(cuid())
+  providerId     String
+  label          String
+  encryptedValue String
+  iv             String
+  authTag        String
+  keyHint        String
+  enabled        Boolean          @default(true)
+  priority       Int              @default(0)
+  lastTestedAt   DateTime?
+  lastTestStatus String?
+  provider       AiProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([providerId, enabled, priority])
+}
+
+model AiUsageBucket {
+  provider  AiProviderType
+  day       DateTime       @db.Date
+  count     Int            @default(0)
+  updatedAt DateTime       @updatedAt
+
+  @@id([provider, day])
 }

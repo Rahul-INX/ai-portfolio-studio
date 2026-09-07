@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { evidenceBlock, gatherPortfolioContext, sourcesBlock, type ContextGatheringResult } from "@/lib/site-context";
 import { getSiteProfile } from "@/lib/content";
+import { runTextWithFallback } from "@/lib/ai-providers";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -62,34 +63,6 @@ function streamText(text: string) {
   });
 }
 
-async function readProviderText(response: Response) {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let output = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") continue;
-      try {
-        const parsedChunk = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
-        output += parsedChunk.choices?.[0]?.delta?.content ?? "";
-      } catch {
-        // Ignore malformed provider chunks and keep reading.
-      }
-    }
-  }
-  return output;
-}
-
 function normalizeProviderAnswer(answer: string, context: ContextGatheringResult) {
   const withoutPlaceholderDomains = answer.replace(/https?:\/\/example\.com/g, "");
   const hasSources = /\n\s*Sources\s*:?\s*\n/i.test(withoutPlaceholderDomains);
@@ -107,12 +80,6 @@ export async function POST(request: Request) {
   const context = await gatherPortfolioContext(parsed.data.message, parsed.data.path);
   const profile = await getSiteProfile();
   const contextBlock = evidenceBlock(context.evidence);
-
-  if (!process.env.OPENAI_API_KEY) {
-    return new Response(streamText(fallbackAnswer(parsed.data.message, context, profile.name)), {
-      headers: { ...streamHeaders, "X-Assistant-Mode": "local-fallback" }
-    });
-  }
 
   const systemContent = `You are ${profile.name}'s portfolio assistant. Answer only from gathered portfolio evidence. The visible chat is the main agent; background site context gathering has already happened, so do not mention sub-agents or internal retrieval mechanics.
 
@@ -138,12 +105,7 @@ Scopes: ${context.decision.scopes.join(", ")}
 Gathered evidence:
 ${contextBlock}`;
 
-  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-    {
-      role: "system",
-      content: systemContent
-    }
-  ];
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
   if (parsed.data.history) {
     const recentHistory = parsed.data.history.slice(-10);
@@ -161,29 +123,20 @@ ${contextBlock}`;
 Question: ${parsed.data.message}`
   });
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+  try {
+    const result = await runTextWithFallback({
+      system: systemContent,
+      messages,
       temperature: 0.2,
-      stream: true,
-      messages
-    })
-  });
-
-  if (!response.ok || !response.body) {
+      enforceQuota: true,
+    });
+    const answer = normalizeProviderAnswer(result.text, context);
+    return new Response(streamText(answer), {
+      headers: { ...streamHeaders, "X-Assistant-Mode": result.provider.toLowerCase() }
+    });
+  } catch {
     return new Response(streamText(fallbackAnswer(parsed.data.message, context, profile.name)), {
-      headers: { ...streamHeaders, "X-Assistant-Mode": "openai-fallback" }
+      headers: { ...streamHeaders, "X-Assistant-Mode": "local-fallback" }
     });
   }
-
-  const answer = normalizeProviderAnswer(await readProviderText(response), context);
-
-  return new Response(streamText(answer), {
-    headers: { ...streamHeaders, "X-Assistant-Mode": "openai" }
-  });
 }

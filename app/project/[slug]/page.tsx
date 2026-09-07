@@ -58,7 +58,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
             {project.status}
           </p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-normal">{project.title}</h1>
+          <h1 className="editorial-title mt-4 text-4xl sm:text-5xl">{project.title}</h1>
           {(project.startDate || project.endDate) ? (
             <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[var(--muted)]">{dateRange}</p>
           ) : null}

@@ -12,7 +12,8 @@ export function SectionHeading({
   title,
   description,
   profile,
-  editable
+  editable,
+  level = "h2"
 }: {
   eyebrow: string;
   title: string;
@@ -23,6 +24,7 @@ export function SectionHeading({
     title?: keyof SiteProfile;
     description?: keyof SiteProfile;
   };
+  level?: "h1" | "h2";
 }) {
   const router = useRouter();
   const { editMode } = useEditMode();
@@ -42,6 +44,7 @@ export function SectionHeading({
   }
 
   const current = draft ?? profile;
+  const Heading = level;
 
   return (
     <div className="grid max-w-5xl gap-4 md:grid-cols-[0.34fr_1fr] md:gap-8">
@@ -57,15 +60,15 @@ export function SectionHeading({
         )}
       </div>
       <div>
-        {editMode && editable?.title && current ? (
-          <InlineTextEditor
-            label={String(editable.title)}
-            value={String(current[editable.title] ?? title)}
-            onSave={(value) => saveField(editable.title!, value)}
-          />
-        ) : (
-          <h2 className="text-balance text-3xl font-semibold tracking-[-0.035em] text-[var(--foreground)] sm:text-4xl">{title}</h2>
-        )}
+        <Heading className="editorial-title text-balance text-3xl text-[var(--foreground)] sm:text-4xl">
+          {editMode && editable?.title && current ? (
+            <InlineTextEditor
+              label={String(editable.title)}
+              value={String(current[editable.title] ?? title)}
+              onSave={(value) => saveField(editable.title!, value)}
+            />
+          ) : title}
+        </Heading>
         <div className="mt-4 max-w-3xl text-base leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
           {editMode && editable?.description && current ? (
             <InlineTextEditor

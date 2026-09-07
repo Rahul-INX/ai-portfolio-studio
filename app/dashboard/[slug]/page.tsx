@@ -32,7 +32,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">Dashboard</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-normal">{item.title}</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">{item.summary}</p>
-        <div id="preview" className="surface quiet-grid mt-10 grid min-h-[420px] scroll-mt-24 place-items-center rounded-lg p-8">
+        <div id="preview" className="surface mt-10 grid min-h-[420px] scroll-mt-24 place-items-center rounded-lg p-8">
           {item.embedUrl ? (
             <iframe title={item.title} src={item.embedUrl} className="h-[520px] w-full rounded-md border hairline" />
           ) : item.imageUrl ? (

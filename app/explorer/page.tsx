@@ -15,6 +15,7 @@ export default async function ExplorerPage() {
     <SiteShell profile={profile}>
       <section id="explorer" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeading
+          level="h1"
           eyebrow={profile.explorerEyebrow}
           title={profile.explorerTitle}
           description={profile.explorerDescription}

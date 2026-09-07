@@ -2,9 +2,9 @@
 
 import { Check, ImageIcon, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { readApiResponse } from "@/lib/api-response";
 import Cropper, { type Area, type Point } from "react-easy-crop";
 import { resolvePortfolioMedia } from "@/lib/media";
+import { uploadPortfolioMedia } from "@/lib/media-upload";
 
 const PROFILE_ASPECT = 4 / 5;
 
@@ -70,13 +70,10 @@ export function ProfileImageCropper({
     onMessage("Cropping and uploading portrait...");
     try {
       const file = await croppedImageFile(source, pixels);
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch("/api/media", { method: "POST", body: form });
-      const payload = await readApiResponse<{ url?: string }>(response);
-      if (!payload.url) throw new Error("Image upload did not return a URL.");
+      const url = await uploadPortfolioMedia(file, "profile", "/api/media");
+      if (!url) throw new Error("Image upload did not return a URL.");
       onMessage("Upload complete. Publishing portrait...");
-      await onChange(payload.url);
+      await onChange(url);
       setSource("");
       setCrop({ x: 0, y: 0 });
       setZoom(1);

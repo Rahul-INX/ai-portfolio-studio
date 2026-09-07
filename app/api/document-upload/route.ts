@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   DOCUMENT_TYPES,
@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return errorResponse("Unauthorized", 401);
+    }
+    if (!isAdminSession(session)) {
+      return errorResponse("Forbidden", 403);
     }
     if (!process.env.DATABASE_URL) {
       return errorResponse("DATABASE_URL is required for uploads.", 503);

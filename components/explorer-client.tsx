@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ContentCard } from "@/components/card";
 import type { ContentKind, ExplorerItem } from "@/lib/types";
@@ -39,28 +39,45 @@ export function ExplorerClient({ items }: { items: ExplorerItem[] }) {
   const [query, setQuery] = useState("");
   const [activeKinds, setActiveKinds] = useState<Set<ContentKind>>(new Set());
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
 
-  const tagFilters = useMemo(() => deriveTagFilters(items), [items]);
+  const publishableItems = useMemo(
+    () => items.filter((item) => item.kind !== "dashboard" || Boolean(item.embedUrl || item.imageUrl)),
+    [items],
+  );
+  const featured = useMemo(() => {
+    const featuredProjects = publishableItems.filter(
+      (item): item is Extract<ExplorerItem, { kind: "project" }> => item.kind === "project" && Boolean(item.featured),
+    );
+    const remainingProjects = publishableItems.filter(
+      (item): item is Extract<ExplorerItem, { kind: "project" }> => item.kind === "project" && !item.featured,
+    );
+    return [...featuredProjects, ...remainingProjects].slice(0, 3);
+  }, [publishableItems]);
+
+  const tagFilters = useMemo(() => deriveTagFilters(publishableItems), [publishableItems]);
 
   // Compute available kinds with counts
   const kindCounts = useMemo(() => {
     const counts = new Map<ContentKind, number>();
-    for (const item of items) {
+    for (const item of publishableItems) {
       counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
     }
     return counts;
-  }, [items]);
+  }, [publishableItems]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((item) => {
+    return publishableItems.filter((item) => {
       const text = `${item.title} ${"summary" in item ? item.summary : item.excerpt} ${item.tags.join(" ")}`.toLowerCase();
       const matchesQuery = !q || text.includes(q);
       const matchesKind = activeKinds.size === 0 || activeKinds.has(item.kind);
       const matchesTag = !activeTag || item.tags.includes(activeTag);
       return matchesQuery && matchesKind && matchesTag;
     });
-  }, [activeKinds, activeTag, items, query]);
+  }, [activeKinds, activeTag, publishableItems, query]);
+
+  const archiveIsOpen = showArchive || Boolean(query || activeKinds.size || activeTag);
 
   function toggleKind(kind: ContentKind) {
     setActiveKinds((prev) => {
@@ -76,6 +93,38 @@ export function ExplorerClient({ items }: { items: ExplorerItem[] }) {
 
   return (
     <div>
+      <section aria-labelledby="featured-work-title">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b hairline pb-5">
+          <div>
+            <p className="eyebrow">Start here</p>
+            <h2 id="featured-work-title" className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Selected work</h2>
+          </div>
+          <p className="max-w-md text-sm leading-6 text-[var(--muted)]">Three systems chosen for the clearest evidence of product thinking, technical judgment, and implementation depth.</p>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {featured.map((item) => <ContentCard key={`${item.kind}-${item.slug}`} item={item} />)}
+        </div>
+      </section>
+
+      <section className="mt-12" aria-labelledby="archive-title">
+        <div className="surface overflow-hidden rounded-lg">
+          <button
+            type="button"
+            aria-expanded={archiveIsOpen}
+            aria-controls="portfolio-archive"
+            onClick={() => setShowArchive((current) => !current)}
+            className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-[color-mix(in_srgb,var(--accent),transparent_94%)]"
+          >
+            <span>
+              <span className="eyebrow">Supporting evidence</span>
+              <span id="archive-title" className="mt-2 block text-lg font-semibold">Browse the full archive</span>
+              <span className="mt-1 block text-sm text-[var(--muted)]">Experiments, writing, and additional systems stay available without competing with the hiring story.</span>
+            </span>
+            <ArrowRight aria-hidden className={`h-5 w-5 shrink-0 transition ${archiveIsOpen ? "rotate-90" : ""}`} />
+          </button>
+        </div>
+
+        {archiveIsOpen ? <div id="portfolio-archive" className="mt-4">
       <div className="surface rounded-lg p-4">
         {/* Search bar */}
         <label className="relative block">
@@ -195,6 +244,8 @@ export function ExplorerClient({ items }: { items: ExplorerItem[] }) {
           </p>
         </div>
       )}
+        </div> : null}
+      </section>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
+  workers: 1,
   timeout: 30_000,
   expect: {
     timeout: 8_000
@@ -11,14 +12,14 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command: "npm.cmd run start -- --hostname 127.0.0.1 --port 3100",
+    command: "npm run start -- --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
     timeout: 60_000,
     env: {
       NEXTAUTH_URL: "http://127.0.0.1:3100",
       NEXTAUTH_SECRET: "playwright-local-verification-secret",
-      OPENAI_API_KEY: ""
+      GEMINI_API_KEY: ""
     }
   },
   projects: [

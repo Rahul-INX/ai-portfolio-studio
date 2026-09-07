@@ -28,8 +28,8 @@ import {
   CheckSquare,
   Table,
 } from "lucide-react";
-import { readApiResponse } from "@/lib/api-response";
 import { slugifySection } from "@/lib/citations";
+import { uploadPortfolioMedia } from "@/lib/media-upload";
 
 /* ─── Types ───────────────────────────────────────────────────────── */
 
@@ -252,7 +252,7 @@ async function renderMarkdown(source: string): Promise<string> {
 
 async function uploadImage(file: File): Promise<string | null> {
   // Validate client-side
-  const maxSize = 4 * 1024 * 1024;
+  const maxSize = 100 * 1024 * 1024;
   const allowedTypes = [
     "image/jpeg",
     "image/png",
@@ -261,12 +261,7 @@ async function uploadImage(file: File): Promise<string | null> {
   ];
   if (!allowedTypes.includes(file.type) || file.size > maxSize) return null;
 
-  const form = new FormData();
-  form.append("file", file);
-
-  const response = await fetch("/api/media", { method: "POST", body: form });
-  const data = await readApiResponse<{ url?: string }>(response);
-  return data.url ?? null;
+  return uploadPortfolioMedia(file, "blogs", "/api/media");
 }
 
 /* ─── Component ───────────────────────────────────────────────────── */

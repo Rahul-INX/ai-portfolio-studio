@@ -36,6 +36,7 @@ export default async function TimelinePage() {
     <SiteShell profile={profile}>
       <section id="timeline" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeading
+          level="h1"
           eyebrow={profile.timelineEyebrow}
           title={profile.timelineTitle}
           description={profile.timelineDescription}
@@ -97,9 +98,6 @@ export default async function TimelinePage() {
                       <span>{skill.name}</span>
                       <span className="font-mono text-xs text-[var(--muted)]">{skill.category}</span>
                     </div>
-                    <div className="mt-2 h-2 rounded-full bg-[color-mix(in_srgb,var(--foreground),transparent_90%)]">
-                      <div className="h-full rounded-full bg-cobalt-500" style={{ width: `${skill.level}%` }} />
-                    </div>
                   </div>
                 ))}
               </div>
@@ -127,7 +125,7 @@ export default async function TimelinePage() {
               <article
                 id={`timeline-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`}
                 key={item.title}
-                className="surface relative ml-8 scroll-mt-24 rounded-2xl p-5 before:absolute before:-left-[2.05rem] before:top-7 before:h-4 before:w-4 before:rounded-full before:border-4 before:border-[var(--background)] before:bg-[var(--accent)]"
+                className="surface relative ml-8 scroll-mt-24 rounded-lg p-5 before:absolute before:-left-[2.05rem] before:top-7 before:h-4 before:w-4 before:rounded-full before:border-4 before:border-[var(--background)] before:bg-[var(--accent)]"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>

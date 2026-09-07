@@ -1,34 +1,37 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 import { ContentCard } from "@/components/card";
-import { KnowledgeGraph } from "@/components/knowledge-graph";
-import { MotionPanel } from "@/components/motion-panel";
 import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
 import { InlineProfileText } from "@/components/inline-profile-text";
 import { EditableHero } from "@/components/editable-hero";
 import { EditableAchievements } from "@/components/editable-achievements";
-import { getAchievements, getExplorerItems, getProjects, getSiteProfile, getSkills } from "@/lib/content";
+import { RecruiterBrief } from "@/components/recruiter-brief";
+import { getAchievements, getProjects, getSiteProfile } from "@/lib/content";
+import { isRenderableProfileImage } from "@/lib/media";
+
+function recruiterCopy(value: string, fallback: string) {
+  return /\b(editable|edit mode|cms)\b/i.test(value) ? fallback : value;
+}
 
 export default async function HomePage() {
   // Fetch sequentially to avoid exhausting Neon's connection pool.
   // React `cache()` deduplicates, so getProjects() inside getExplorerItems is free.
   const profile = await getSiteProfile();
   const projects = await getProjects();
-  const items = await getExplorerItems();
-  const skills = await getSkills();
   const achievements = await getAchievements();
-  const featured = projects.filter((project) => project.featured).slice(0, 2);
-  const recent = items.slice(0, 4);
+  const featuredProjects = projects.filter((project) => project.featured);
+  const featured = [...featuredProjects, ...projects.filter((project) => !project.featured)].slice(0, 3);
+  const profileImage = isRenderableProfileImage(profile.profileImageUrl) ? profile.profileImageUrl : undefined;
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: profile.name,
     jobTitle: profile.role,
-    image: profile.profileImageUrl,
+    image: profileImage,
     email: profile.contactEmail,
     telephone: profile.contactPhone,
     address: profile.contactLocation,
@@ -39,14 +42,14 @@ export default async function HomePage() {
     <SiteShell profile={profile}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section id="overview" className="relative overflow-hidden border-b hairline">
-        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:px-8 lg:py-20 xl:gap-20">
-          <MotionPanel><EditableHero profile={profile} /></MotionPanel>
+        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:px-8 lg:py-14 xl:gap-20">
+          <div><EditableHero profile={profile} /></div>
 
-          <MotionPanel delay={0.08} className="lg:pt-8">
+          <div className="lg:pt-8">
             <div className="relative mx-auto aspect-[4/5] w-full max-w-[15rem] overflow-hidden rounded-xl bg-[var(--panel-strong)] lg:mx-0 lg:ml-auto">
-              {profile.profileImageUrl ? (
+              {profileImage ? (
                 <Image
-                  src={profile.profileImageUrl}
+                  src={profileImage}
                   alt={`${profile.name} portrait`}
                   fill
                   priority
@@ -92,26 +95,29 @@ export default async function HomePage() {
                 <Mail aria-hidden className="h-4 w-4" /> {profile.contactCtaLabel || "Start a conversation"}
               </a>
             </div>
-          </MotionPanel>
+          </div>
         </div>
       </section>
 
-      <section className="border-b hairline bg-[var(--panel)]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[0.34fr_1fr] lg:px-8">
-          <InlineProfileText profile={profile} field="homeLatestEyebrow" label="Latest evidence label" value={profile.homeLatestEyebrow} className="eyebrow" />
-          <div>
-            <div className="grid gap-px overflow-hidden rounded-lg border hairline bg-[var(--line)] sm:grid-cols-2">
-              {recent.map((item) => (
-                <Link
-                  key={`${item.kind}-${item.slug}`}
-                  href={`/${item.kind}/${item.slug}`}
-                  className="bg-[var(--panel-strong)] p-4 transition hover:bg-[color-mix(in_srgb,var(--accent),transparent_92%)]"
-                >
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">{item.kind}</p>
-                </Link>
-              ))}
+      <RecruiterBrief profile={profile} />
+
+      <section id="selected-systems" className="border-b hairline">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="grid gap-4 lg:grid-cols-[0.34fr_1fr]">
+            <p className="eyebrow"><InlineProfileText profile={profile} field="homeSystemsEyebrow" label="Selected systems eyebrow" value={profile.homeSystemsEyebrow} /></p>
+            <div>
+              <h2 className="editorial-title text-balance text-4xl leading-[1.02] sm:text-5xl"><InlineProfileText profile={profile} field="homeSystemsTitle" label="Selected systems title" value={profile.homeSystemsTitle} /></h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]"><InlineProfileText profile={profile} field="homeSystemsDescription" label="Selected systems description" value={profile.homeSystemsDescription} multiline /></p>
             </div>
+          </div>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {featured.map((item) => (
+              <ContentCard key={item.slug} item={item} />
+            ))}
+          </div>
+          <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t hairline pt-6">
+            <p className="text-sm text-[var(--muted)]">More experiments, writing, dashboards, and technical notes are available in the full explorer.</p>
+            <Link href="/explorer" className="inline-flex h-10 items-center gap-2 rounded-md border hairline px-4 text-sm font-semibold transition hover:border-[var(--accent)]">Browse all evidence <ArrowRight aria-hidden className="h-4 w-4" /></Link>
           </div>
         </div>
       </section>
@@ -120,8 +126,8 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
           <SectionHeading
             eyebrow={profile.awardsEyebrow}
-            title={profile.awardsTitle}
-            description={profile.awardsDescription}
+            title={recruiterCopy(profile.awardsTitle, "Evidence supporting the AI engineering story.")}
+            description={recruiterCopy(profile.awardsDescription, "Awards, credentials, leadership signals, and milestone proof relevant to the work.")}
             profile={profile}
             editable={{
               eyebrow: "awardsEyebrow",
@@ -135,30 +141,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-b hairline">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <SectionHeading
-            eyebrow={profile.homeSystemsEyebrow}
-            title={profile.homeSystemsTitle}
-            description={profile.homeSystemsDescription}
-            profile={profile}
-            editable={{
-              eyebrow: "homeSystemsEyebrow",
-              title: "homeSystemsTitle",
-              description: "homeSystemsDescription"
-            }}
-          />
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            {featured.map((item) => (
-              <ContentCard key={item.slug} item={item} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <KnowledgeGraph skills={skills} />
-      </section>
     </SiteShell>
   );
 }

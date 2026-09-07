@@ -131,7 +131,6 @@ function snippetFor(queryTerms: string[], item: SiteContextItem) {
 }
 
 function classifyContextIntent(message: string, currentItem?: SiteContextItem) {
-  if (!currentItem) return { search: true, reason: "No current-page content was found for this route." };
   const normalized = normalize(message);
   const downloadIntent = [
     "resume",
@@ -145,6 +144,7 @@ function classifyContextIntent(message: string, currentItem?: SiteContextItem) {
   if (downloadIntent) {
     return { search: true, reason: "The question asks for resume, CV, download, profile, or contact evidence.", intent: "download" as const };
   }
+  if (!currentItem) return { search: true, reason: "No current-page content was found for this route.", intent: "portfolio" as const };
   const broadIntent = [
     "all",
     "best",

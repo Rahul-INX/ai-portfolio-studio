@@ -14,6 +14,10 @@ const signals = [
   { icon: BarChart3, label: "modelLabel", value: "modelValue" }
 ] as const;
 
+function publicSignal(value: string, fallback: string) {
+  return /\b(editable|edit mode|cms)\b/i.test(value) ? fallback : value;
+}
+
 export function EditableHero({ profile }: { profile: SiteProfile }) {
   const router = useRouter();
   const [draft, setDraft] = useState(profile);
@@ -107,16 +111,16 @@ export function EditableHero({ profile }: { profile: SiteProfile }) {
     >
       <div className="p-1">
         <p className="eyebrow">{draft.heroEyebrow}</p>
-        <h1 className="display-title text-balance mt-6 max-w-5xl text-[var(--foreground)]">{draft.heroTitle}</h1>
+        <h1 className="display-title editorial-title text-balance mt-6 max-w-5xl text-[var(--foreground)]">{draft.heroTitle}</h1>
         <p className="mt-7 max-w-3xl text-lg leading-8 text-[var(--text-secondary)] sm:text-xl">{draft.heroSummary}</p>
         <div className="mt-8 grid gap-px overflow-hidden rounded-xl border hairline bg-[var(--line)] sm:grid-cols-3">
           {signals.map((signal) => (
             <div key={signal.label} className="bg-[var(--panel-strong)] p-4">
               <div className="flex items-center gap-2">
                 <signal.icon aria-hidden className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{draft[signal.label]}</p>
+                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{publicSignal(draft[signal.label], "Evidence signal")}</p>
               </div>
-              <p className="mt-2 text-sm font-semibold leading-5">{draft[signal.value]}</p>
+              <p className="mt-2 text-sm font-semibold leading-5">{publicSignal(draft[signal.value], "Explore the work, methods, and results.")}</p>
             </div>
           ))}
         </div>

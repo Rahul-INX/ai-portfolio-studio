@@ -5,7 +5,7 @@ import lighthouse from "lighthouse";
 
 const port = 3200;
 const baseUrl = `http://127.0.0.1:${port}`;
-const routes = ["/", "/explorer", "/project/retrieval-quality-workbench", "/blog/what-i-measure-before-shipping-rag"];
+const routes = ["/", "/explorer", "/timeline", "/blog/what-i-measure-before-shipping-rag"];
 const thresholds = {
   performance: 0.95,
   accessibility: 0.95,
@@ -30,7 +30,8 @@ async function waitForServer() {
   throw new Error(`Server did not start at ${baseUrl}`);
 }
 
-const startCommand = `npm.cmd run start -- --hostname 127.0.0.1 --port ${port}`;
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const startCommand = `${npmCommand} run start -- --hostname 127.0.0.1 --port ${port}`;
 const server = spawn(process.platform === "win32" ? "cmd.exe" : "sh", process.platform === "win32" ? ["/d", "/s", "/c", startCommand] : ["-c", startCommand], {
   env: {
     ...process.env,

@@ -74,12 +74,9 @@ function ResultPanel({ result, profile }: { result: JobFitResult; profile: SiteP
             </div>
           </div>
           <div className="border-t hairline pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-            <div className="flex items-end gap-2">
-              <span className="text-6xl font-semibold tracking-[-0.06em] tabular-nums">{result.overallScore}</span>
-              <span className="pb-2 text-sm text-[var(--muted)]">/ 100</span>
-            </div>
-            <p className="mt-2 text-sm font-semibold">{result.fitLabel}</p>
-            <p className="mt-1 text-xs text-[var(--muted)]">{result.confidence} confidence</p>
+            <p className="eyebrow">Evidence coverage</p>
+            <p className="mt-2 text-lg font-semibold">{result.fitLabel}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">{result.confidence} confidence · based on public portfolio evidence</p>
           </div>
         </div>
 
@@ -515,7 +512,7 @@ export function JobFitClient({ timeoutSeconds, profile }: { timeoutSeconds: numb
           <section className="surface min-h-[28rem] rounded-lg p-6">
             <div className="grid gap-4 md:grid-cols-3">
               {[
-                { icon: Gauge, label: profile.jobFitStatScoreLabel || "Fit score", value: "0-100" },
+                { icon: Gauge, label: "Assessment", value: "Evidence-led review" },
                 { icon: BarChart3, label: profile.jobFitStatRubricLabel || "Rubric", value: "Derived from this JD" },
                 { icon: ShieldCheck, label: profile.jobFitStatEvidenceLabel || "Evidence", value: "Public site data" }
               ].map((item) => (

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminSession } from "@/lib/auth";
 import { getJobFitSettings, normalizeJobFitTimeout } from "@/lib/job-fit-settings";
 import { prisma } from "@/lib/prisma";
 
@@ -10,21 +10,24 @@ const settingsSchema = z.object({
   fallbackTimeoutSeconds: z.number().int().min(5).max(120)
 });
 
-async function isAuthorized() {
-  const session = await getServerSession(authOptions);
-  return Boolean(session?.user?.id);
-}
-
 export async function GET() {
-  if (!(await isAuthorized())) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isAdminSession(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return NextResponse.json({ settings: await getJobFitSettings() });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthorized())) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isAdminSession(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ error: "DATABASE_URL is required to save settings." }, { status: 503 });

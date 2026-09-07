@@ -69,6 +69,7 @@ type AchievementRow = {
   highlighted: boolean;
   sortOrder: number;
   publishedAt: Date | string | null;
+  visibility: "DRAFT" | "PUBLISHED" | "ARCHIVED";
 };
 
 function achievementClient() {
@@ -77,10 +78,10 @@ function achievementClient() {
   } }).achievement;
 }
 
-async function queryAchievements(): Promise<AchievementRow[]> {
+async function queryAchievements(includeUnpublished = false): Promise<AchievementRow[]> {
   const model = achievementClient();
   if (model) return model.findMany({
-    where: { visibility: "PUBLISHED" },
+    where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
     orderBy: [{ highlighted: "desc" }, { sortOrder: "asc" }, { awardedAt: "desc" }]
   }) as Promise<AchievementRow[]>;
   return prisma.$queryRaw<AchievementRow[]>`
@@ -126,12 +127,12 @@ function asArchitecture(value: unknown): ArchitectureCanvas {
   return { layers: [], principles: [], riskControls: [] };
 }
 
-export const getProjects = cache(async (): Promise<SafeProject[]> => {
+export const getProjects = cache(async (includeUnpublished = false): Promise<SafeProject[]> => {
   if (!canReadDatabase()) return safeProjects;
   try {
     const rows = await withRetry(() =>
       prisma.project.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: [{ featured: "desc" }, { publishedAt: "desc" }]
       })
     );
@@ -156,6 +157,7 @@ export const getProjects = cache(async (): Promise<SafeProject[]> => {
       startDate: row.startDate?.toISOString(),
       endDate: row.endDate?.toISOString(),
       publishedAt: row.publishedAt?.toISOString()
+      ,visibility: row.visibility
     }));
   } catch (error) {
     markDatabaseUnavailable(error);
@@ -163,12 +165,12 @@ export const getProjects = cache(async (): Promise<SafeProject[]> => {
   }
 });
 
-export const getCaseStudies = cache(async (): Promise<SafeCaseStudy[]> => {
+export const getCaseStudies = cache(async (includeUnpublished = false): Promise<SafeCaseStudy[]> => {
   if (!canReadDatabase()) return safeCaseStudies;
   try {
     const rows = await withRetry(() =>
       prisma.caseStudy.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: { publishedAt: "desc" }
       })
     );
@@ -185,6 +187,7 @@ export const getCaseStudies = cache(async (): Promise<SafeCaseStudy[]> => {
       tags: row.tags,
       imageUrl: row.imageUrl ?? undefined,
       publishedAt: row.publishedAt?.toISOString()
+      ,visibility: row.visibility
     }));
   } catch (error) {
     markDatabaseUnavailable(error);
@@ -192,12 +195,12 @@ export const getCaseStudies = cache(async (): Promise<SafeCaseStudy[]> => {
   }
 });
 
-export const getExperiments = cache(async (): Promise<SafeExperiment[]> => {
+export const getExperiments = cache(async (includeUnpublished = false): Promise<SafeExperiment[]> => {
   if (!canReadDatabase()) return safeExperiments;
   try {
     const rows = await withRetry(() =>
       prisma.experiment.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: { publishedAt: "desc" }
       })
     );
@@ -216,6 +219,7 @@ export const getExperiments = cache(async (): Promise<SafeExperiment[]> => {
       metrics: asMetrics(row.metrics),
       imageUrl: row.imageUrl ?? undefined,
       publishedAt: row.publishedAt?.toISOString()
+      ,visibility: row.visibility
     }));
   } catch (error) {
     markDatabaseUnavailable(error);
@@ -223,12 +227,12 @@ export const getExperiments = cache(async (): Promise<SafeExperiment[]> => {
   }
 });
 
-export const getBlogs = cache(async (): Promise<SafeBlog[]> => {
+export const getBlogs = cache(async (includeUnpublished = false): Promise<SafeBlog[]> => {
   if (!canReadDatabase()) return safeBlogs;
   try {
     const rows = await withRetry(() =>
       prisma.blog.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: { publishedAt: "desc" }
       })
     );
@@ -245,6 +249,7 @@ export const getBlogs = cache(async (): Promise<SafeBlog[]> => {
       seoSummary: row.seoSummary,
       imageUrl: row.imageUrl ?? undefined,
       publishedAt: row.publishedAt?.toISOString()
+      ,visibility: row.visibility
     }));
   } catch (error) {
     markDatabaseUnavailable(error);
@@ -252,12 +257,12 @@ export const getBlogs = cache(async (): Promise<SafeBlog[]> => {
   }
 });
 
-export const getDashboards = cache(async (): Promise<SafeDashboard[]> => {
+export const getDashboards = cache(async (includeUnpublished = false): Promise<SafeDashboard[]> => {
   if (!canReadDatabase()) return safeDashboards;
   try {
     const rows = await withRetry(() =>
       prisma.dashboard.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: { publishedAt: "desc" }
       })
     );
@@ -271,6 +276,7 @@ export const getDashboards = cache(async (): Promise<SafeDashboard[]> => {
       imageUrl: row.imageUrl ?? undefined,
       tags: row.tags,
       publishedAt: row.publishedAt?.toISOString()
+      ,visibility: row.visibility
     }));
   } catch (error) {
     markDatabaseUnavailable(error);
@@ -348,10 +354,10 @@ export const getCertifications = cache(async () => {
   }
 });
 
-export const getAchievements = cache(async (): Promise<AchievementSignal[]> => {
+export const getAchievements = cache(async (includeUnpublished = false): Promise<AchievementSignal[]> => {
   if (!canReadDatabase()) return safeAchievements;
   try {
-    const rows = await withRetry(() => queryAchievements());
+    const rows = await withRetry(() => queryAchievements(includeUnpublished));
     return rows.length
       ? rows.map((row) => ({
           id: row.id,
@@ -366,6 +372,7 @@ export const getAchievements = cache(async (): Promise<AchievementSignal[]> => {
           highlighted: row.highlighted,
           sortOrder: row.sortOrder,
           publishedAt: row.publishedAt instanceof Date ? row.publishedAt.toISOString() : row.publishedAt ?? undefined
+          ,visibility: row.visibility
         }))
       : safeAchievements;
   } catch (error) {
@@ -374,12 +381,12 @@ export const getAchievements = cache(async (): Promise<AchievementSignal[]> => {
   }
 });
 
-export const getPortfolioDocuments = cache(async (): Promise<PortfolioDocument[]> => {
+export const getPortfolioDocuments = cache(async (includeUnpublished = false): Promise<PortfolioDocument[]> => {
   if (!canReadDatabase()) return safePortfolioDocuments;
   try {
     const rows = await withRetry(() =>
       prisma.portfolioDocument.findMany({
-        where: { visibility: "PUBLISHED" },
+        where: includeUnpublished ? undefined : { visibility: "PUBLISHED" },
         orderBy: [{ kind: "asc" }, { publishedAt: "desc" }]
       })
     );
@@ -392,6 +399,7 @@ export const getPortfolioDocuments = cache(async (): Promise<PortfolioDocument[]
           fileUrl: row.fileUrl,
           versionLabel: row.versionLabel,
           publishedAt: row.publishedAt?.toISOString()
+          ,visibility: row.visibility
         }))
       : safePortfolioDocuments;
   } catch (error) {

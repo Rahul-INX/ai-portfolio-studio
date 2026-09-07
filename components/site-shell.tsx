@@ -7,9 +7,9 @@ import { GitHubIcon, LinkedInIcon } from "@/components/social-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NavigationFeedback } from "@/components/navigation-feedback";
 import { EditModeProvider } from "@/components/edit-mode-provider";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { safeSiteProfile } from "@/lib/safe-content";
+import { isRenderableProfileImage } from "@/lib/media";
 import type { SiteProfile } from "@/lib/types";
 
 function telHref(phone?: string | null) {
@@ -17,7 +17,8 @@ function telHref(phone?: string | null) {
 }
 
 export async function SiteShell({ children, profile = safeSiteProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
+  const profileImage = isRenderableProfileImage(profile.profileImageUrl) ? profile.profileImageUrl : undefined;
   const nav = [
     { href: "/explorer", label: profile.navExplorerLabel || "Systems Explorer" },
     { href: "/timeline", label: profile.navExperienceLabel || "Experience" },
@@ -54,9 +55,9 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
           <div className="flex min-h-[4rem] items-center justify-between gap-4 py-2.5">
             <Link href="/" className="group flex min-w-0 items-center gap-3" aria-label="Home">
               <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border hairline bg-ink-900 text-xs font-semibold text-ink-50 dark:bg-ink-50 dark:text-ink-900">
-                {profile.profileImageUrl ? (
+                {profileImage ? (
                   <Image
-                    src={profile.profileImageUrl}
+                    src={profileImage}
                     alt={`${profile.name} portrait`}
                     fill
                     sizes="44px"

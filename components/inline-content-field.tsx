@@ -13,6 +13,7 @@ export function InlineContentField({
   field,
   label,
   value,
+  displayValue = value,
   multiline = false,
   className
 }: {
@@ -20,6 +21,7 @@ export function InlineContentField({
   field: string;
   label: string;
   value: string;
+  displayValue?: string;
   multiline?: boolean;
   className?: string;
 }) {
@@ -38,7 +40,7 @@ export function InlineContentField({
   }
 
   if (!editMode) {
-    return <span className={className}>{value}</span>;
+    return <span className={className}>{displayValue}</span>;
   }
 
   return <InlineTextEditor label={label} value={value} multiline={multiline} onSave={save} />;

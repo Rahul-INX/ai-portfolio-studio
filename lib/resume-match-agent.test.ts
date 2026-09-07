@@ -75,12 +75,10 @@ test("builds a strict native structured-output request from the Zod contract", (
     "You will design, build, test, and maintain software that directly impacts users and business outcomes.",
     "Allowed evidence"
   );
-  const responseFormat = request.response_format;
-  const serializedSchema = JSON.stringify(responseFormat.json_schema.schema);
+  const responseFormat = request.generationConfig;
+  const serializedSchema = JSON.stringify(responseFormat.responseSchema);
 
-  assert.equal(responseFormat.type, "json_schema");
-  assert.equal(responseFormat.json_schema.strict, true);
-  assert.equal(responseFormat.json_schema.name, "resume_match_result");
+  assert.equal(responseFormat.responseMimeType, "application/json");
   assert.match(serializedSchema, /overallScore/);
   assert.match(serializedSchema, /dimensions/);
   assert.doesNotMatch(serializedSchema, /"\$schema"|"default"|"minLength"|"maxLength"/);
@@ -121,12 +119,14 @@ test("accepts a schema-valid agent result grounded in allowed evidence URLs", ()
   assert.match(result?.topEvidence[0].matchReason ?? "", /verified JD signals/i);
 });
 
-test("handles a native structured-output refusal without parsing it as JSON", async () => {
-  const originalKey = process.env.OPENAI_API_KEY;
+test("handles a Gemini safety refusal without parsing it as JSON", async () => {
+  const originalKey = process.env.GEMINI_API_KEY;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
   const originalFetch = global.fetch;
-  process.env.OPENAI_API_KEY = "test-key";
+  process.env.GEMINI_API_KEY = "test-key";
+  delete process.env.DATABASE_URL;
   global.fetch = async () => new Response(JSON.stringify({
-    choices: [{ finish_reason: "stop", message: { refusal: "Cannot evaluate this request." } }]
+    candidates: [{ finishReason: "SAFETY" }]
   }), { status: 200, headers: { "Content-Type": "application/json" } });
 
   try {
@@ -137,11 +137,13 @@ test("handles a native structured-output refusal without parsing it as JSON", as
       evidenceText: "Python FastAPI retrieval evidence scoring.",
       timeoutMs: 1_000
     });
-    assert.deepEqual(result, { ok: false, reason: "refusal", detail: "Cannot evaluate this request." });
+    assert.deepEqual(result, { ok: false, reason: "refusal", detail: "Provider refused the request." });
   } finally {
     global.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = originalKey;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
   }
 });
 

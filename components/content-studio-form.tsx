@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { PortfolioSafetyReview } from "@/components/portfolio-safety-review";
+import { uploadPortfolioMedia } from "@/lib/media-upload";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { readApiResponse } from "@/lib/api-response";
 import { resolvePortfolioMedia } from "@/lib/media";
@@ -43,6 +45,7 @@ type EditableRecord = Record<string, unknown> & {
   slug?: string;
   name?: string;
   documentKind?: string;
+  visibility?: string;
 };
 
 type StudioData = {
@@ -72,6 +75,16 @@ const kindLabels: Record<EditableKind, string> = {
   timeline: "Timeline Event",
   document: "Document"
 };
+
+const visibilityKinds = new Set<EditableKind>([
+  "project",
+  "case-study",
+  "experiment",
+  "blog",
+  "dashboard",
+  "achievement",
+  "document",
+]);
 
 const textFields: Record<EditableKind, string[]> = {
   "site-profile": [
@@ -220,23 +233,23 @@ const longFields = new Set([
   "content"
 ]);
 
+const coreProfileFields = new Set([
+  "name", "initials", "role", "profileImageUrl", "contactEmail", "contactPhone", "contactLocation", "githubUrl", "linkedinUrl",
+  "heroEyebrow", "heroTitle", "heroSummary", "primaryCtaLabel", "secondaryCtaLabel",
+  "focusLabel", "focusValue", "styleLabel", "styleValue", "modelLabel", "modelValue",
+  "homeSystemsEyebrow", "homeSystemsTitle", "homeSystemsDescription"
+]);
+
 type MetricRow = { label: string; value: string; accent?: boolean };
 type ArchitectureCanvasValue = { layers: string[]; principles: string[]; riskControls: string[] };
 
 async function uploadDocument(file: File): Promise<string | null> {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await fetch("/api/document-upload", { method: "POST", body: form });
-  const payload = await readApiResponse<{ url?: string }>(response);
-  return payload.url ?? null;
+  return uploadPortfolioMedia(file, "supporting", "/api/document-upload");
 }
 
-async function uploadImage(file: File): Promise<string | null> {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await fetch("/api/media", { method: "POST", body: form });
-  const payload = await readApiResponse<{ url?: string }>(response);
-  return payload.url ?? null;
+async function uploadImage(file: File, kind: EditableKind): Promise<string | null> {
+  const folder = kind === "project" ? "projects" : kind === "case-study" ? "case-studies" : kind === "experiment" ? "experiments" : kind === "blog" ? "blogs" : kind === "dashboard" ? "dashboards" : kind === "achievement" ? "achievements" : "profile";
+  return uploadPortfolioMedia(file, folder, "/api/media");
 }
 
 function slugify(value: string) {
@@ -381,12 +394,15 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
   const [tags, setTags] = useState("");
   const [techStack, setTechStack] = useState("");
   const [statusValue, setStatusValue] = useState("ACTIVE");
+  const [visibilityValue, setVisibilityValue] = useState("PUBLISHED");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => profileValues(data.profile));
   const [message, setMessage] = useState("");
   const [savedSignature, setSavedSignature] = useState(() =>
-    signatureFor("site-profile", "", "", "", "", "ACTIVE", profileValues(data.profile))
+    signatureFor("site-profile", "", "", "", "", "ACTIVE", "PUBLISHED", profileValues(data.profile))
   );
   const [saving, setSaving] = useState(false);
+  const [fieldFilter, setFieldFilter] = useState("");
+  const [showAllProfileFields, setShowAllProfileFields] = useState(false);
 
   const records = useMemo<Record<EditableKind, EditableRecord[]>>(
     () => ({
@@ -406,6 +422,10 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
   );
 
   const selectedRecords = records[kind];
+  const visibleFields = textFields[kind].filter((field) => {
+    const matchesFilter = !fieldFilter || labelFor(field).toLowerCase().includes(fieldFilter.toLowerCase());
+    return matchesFilter && (kind !== "site-profile" || Boolean(fieldFilter) || showAllProfileFields || coreProfileFields.has(field));
+  });
 
   function profileValues(profile: SiteProfile) {
     return Object.fromEntries(textFields["site-profile"].map((field) => [field, String(profile[field as keyof SiteProfile] ?? "")]));
@@ -421,9 +441,10 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
       setTags("");
       setTechStack("");
       setStatusValue("ACTIVE");
+      setVisibilityValue("PUBLISHED");
       const emptyValues = Object.fromEntries(textFields[nextKind].map((field) => [field, ""]));
       setFieldValues(emptyValues);
-      setSavedSignature(signatureFor(nextKind, "", "", "", "", "ACTIVE", emptyValues));
+      setSavedSignature(signatureFor(nextKind, "", "", "", "", "ACTIVE", "PUBLISHED", emptyValues));
       return;
     }
     const nextValues = Object.fromEntries(
@@ -444,6 +465,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
     setTags(listValue(record.tags));
     setTechStack(listValue(record.techStack));
     setStatusValue(String(record.status ?? "ACTIVE"));
+    setVisibilityValue(String(record.visibility ?? "PUBLISHED"));
     setFieldValues(nextValues);
     setSavedSignature(
       signatureFor(
@@ -453,6 +475,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         listValue(record.tags),
         listValue(record.techStack),
         String(record.status ?? "ACTIVE"),
+        String(record.visibility ?? "PUBLISHED"),
         nextValues
       )
     );
@@ -460,6 +483,8 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
 
   function changeKind(nextKind: EditableKind) {
     setKind(nextKind);
+    setFieldFilter("");
+    setShowAllProfileFields(false);
     const firstKey = nextKind === "site-profile" ? "main" : nextKind === "document" ? "RESUME" : "new";
     loadRecord(nextKind, firstKey);
   }
@@ -478,7 +503,10 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
   }, [searchParams]);
 
   function recordLabel(record: EditableRecord) {
-    return String(record.title ?? record.name ?? record.slug ?? "Untitled");
+    const label = String(record.title ?? record.name ?? record.slug ?? "Untitled");
+    return record.visibility && record.visibility !== "PUBLISHED"
+      ? `${label} · ${String(record.visibility).toLowerCase()}`
+      : label;
   }
 
   function signatureFor(
@@ -488,6 +516,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
     nextTags: string,
     nextTechStack: string,
     nextStatus: string,
+    nextVisibility: string,
     nextFields: Record<string, string>
   ) {
     return JSON.stringify({
@@ -497,11 +526,12 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
       tags: nextTags,
       techStack: nextTechStack,
       status: nextStatus,
+      visibility: nextVisibility,
       fields: nextFields
     });
   }
 
-  const currentSignature = signatureFor(kind, title, slug, tags, techStack, statusValue, fieldValues);
+  const currentSignature = signatureFor(kind, title, slug, tags, techStack, statusValue, visibilityValue, fieldValues);
   const hasUnsavedChanges = currentSignature !== savedSignature;
 
   async function publishProfileImage(profileImageUrl: string) {
@@ -515,7 +545,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         body: JSON.stringify({ kind: "site-profile", ...nextFields })
       });
       await readApiResponse(response);
-      setSavedSignature(signatureFor("site-profile", title, slug, tags, techStack, statusValue, nextFields));
+      setSavedSignature(signatureFor("site-profile", title, slug, tags, techStack, statusValue, visibilityValue, nextFields));
       router.refresh();
     } finally {
       setSaving(false);
@@ -532,7 +562,8 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
       kind,
       title,
       slug: slug || slugify(title),
-      tags: splitList(tags)
+      tags: splitList(tags),
+      visibility: visibilityValue
     };
 
     const payload =
@@ -625,7 +656,8 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                               imageUrl: fieldValues.imageUrl,
                               imageRatio: fieldValues.imageRatio || "4/3",
                               highlighted: fieldValues.highlighted === "true",
-                              sortOrder: Number(fieldValues.sortOrder || 0)
+                              sortOrder: Number(fieldValues.sortOrder || 0),
+                              visibility: visibilityValue
                             }
                           : kind === "document"
                             ? {
@@ -633,8 +665,9 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                                 documentKind: String(selected?.documentKind ?? selected?.kind ?? selectedKey) === "CV" ? "CV" : "RESUME",
                                 title,
                                 description: fieldValues.description,
-                                fileUrl: fieldValues.fileUrl,
-                                versionLabel: fieldValues.versionLabel
+                              fileUrl: fieldValues.fileUrl,
+                              versionLabel: fieldValues.versionLabel,
+                              visibility: visibilityValue
                               }
                             : {
                               kind,
@@ -654,7 +687,11 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
       });
       await readApiResponse(response);
       setSavedSignature(currentSignature);
-      setMessage("Saved and published. Public pages now use the latest database content.");
+      setMessage(
+        visibilityKinds.has(kind) && visibilityValue !== "PUBLISHED"
+          ? `Saved as ${visibilityValue.toLowerCase()}. It is hidden from public pages.`
+          : "Saved and published. Public pages now use the latest database content.",
+      );
       router.refresh();
     } catch (error) {
       setMessage(
@@ -663,6 +700,19 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function applySafetyDraft(draft: { title: string; summary: string; tags: string[] }) {
+    setTitle(draft.title);
+    if (!slug) setSlug(slugify(draft.title));
+    setTags(draft.tags.join(", "));
+    const summaryField = kind === "blog" ? "excerpt" : "summary";
+    setFieldValues((current) => ({
+      ...current,
+      [summaryField]: draft.summary,
+      ...(kind === "blog" && !current.content ? { content: `## Overview\n\n${draft.summary}` } : {}),
+    }));
+    setMessage("Safety-reviewed draft applied. Edit it, verify every claim, then save when ready.");
   }
 
   return (
@@ -780,8 +830,46 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
         </label>
       ) : null}
 
+      {visibilityKinds.has(kind) ? (
+        <label>
+          <span className="text-sm font-medium">Visibility</span>
+          <select
+            value={visibilityValue}
+            onChange={(event) => setVisibilityValue(event.target.value)}
+            className="mt-2 h-11 w-full rounded-md border hairline bg-[var(--panel-strong)] px-3"
+          >
+            <option value="PUBLISHED">Published</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+        </label>
+      ) : null}
+
+      {(["project", "case-study", "experiment", "blog", "dashboard"] as EditableKind[]).includes(kind) ? (
+        <PortfolioSafetyReview
+          kind={kind as "project" | "case-study" | "experiment" | "blog" | "dashboard"}
+          onApply={applySafetyDraft}
+        />
+      ) : null}
+
+      {textFields[kind].length > 12 ? (
+        <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border hairline bg-[var(--panel-strong)] p-3">
+          <label className="min-w-0 flex-1">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Find a field</span>
+            <input value={fieldFilter} onChange={(event) => setFieldFilter(event.target.value)} placeholder="Search labels, SEO, job fit..." className="mt-1.5 h-10 w-full rounded-md border hairline bg-[var(--panel)] px-3 text-sm outline-none focus:border-[var(--accent)]" />
+          </label>
+          {kind === "site-profile" && !showAllProfileFields ? (
+            <button type="button" onClick={() => setShowAllProfileFields(true)} className="h-10 rounded-md border hairline px-3 text-sm font-semibold transition hover:border-[var(--accent)]">Show all page labels</button>
+          ) : null}
+          {kind === "site-profile" && showAllProfileFields ? (
+            <button type="button" onClick={() => setShowAllProfileFields(false)} className="h-10 rounded-md border hairline px-3 text-sm font-semibold transition hover:border-[var(--accent)]">Core profile only</button>
+          ) : null}
+          <p className="text-xs text-[var(--muted)]">{visibleFields.length} fields shown</p>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
-        {textFields[kind].map((field) =>
+        {visibleFields.map((field) =>
           field === "profileImageUrl" ? (
             <ProfileImageCropper
               key={field}
@@ -908,7 +996,7 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                         if (!file) return;
                         setMessage("Uploading image...");
                         try {
-                          const url = await uploadImage(file);
+                          const url = await uploadImage(file, kind);
                           setMessage(url ? "Image uploaded. Save to publish it." : "Image upload failed.");
                           if (url) setFieldValues((current) => ({ ...current, [field]: url }));
                         } catch (error) {
@@ -1008,8 +1096,9 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
                   });
                   await readApiResponse(response);
                   setMessage("Deleted successfully.");
-                  // Force a clean page reload to update database list and reset selection parameters
-                  window.location.href = `/admin/new-project?kind=${kind}&record=new`;
+                  loadRecord(kind, "new");
+                  router.replace(`/admin/new-project?kind=${kind}&record=new`);
+                  router.refresh();
                 } catch (error) {
                   setMessage(
                     `Delete failed: ${error instanceof Error ? error.message : "The server could not be reached."}`
@@ -1025,13 +1114,23 @@ export function ContentStudioForm({ data }: { data: StudioData }) {
             </button>
           ) : null}
           {hasUnsavedChanges ? (
-            <button
-              type="submit"
-              disabled={saving}
-              className="h-11 w-full rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:opacity-60 sm:w-auto dark:bg-ink-50 dark:text-ink-950"
-            >
-              {saving ? "Saving..." : "Save editable content"}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => loadRecord(kind, selectedKey)}
+                className="h-11 w-full rounded-md border hairline px-5 text-sm font-medium transition hover:border-cobalt-500 disabled:opacity-60 sm:w-auto"
+              >
+                Discard changes
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="h-11 w-full rounded-md bg-ink-900 px-5 text-sm font-medium text-white transition hover:bg-cobalt-600 disabled:opacity-60 sm:w-auto dark:bg-ink-50 dark:text-ink-950"
+              >
+                {saving ? "Saving..." : "Save editable content"}
+              </button>
+            </>
           ) : null}
         </div>
       </div>

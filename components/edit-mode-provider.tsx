@@ -28,7 +28,7 @@ export function EditModeProvider({
     <EditModeContext.Provider value={value}>
       {children}
       {authenticated ? (
-        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2">
+        <div className="fixed bottom-20 left-4 z-50 sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2">
           <button
             type="button"
             aria-pressed={editMode}

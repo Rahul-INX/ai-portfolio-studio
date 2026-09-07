@@ -8,7 +8,7 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
 test.describe("portfolio platform", () => {
   test("home renders premium product shell without layout overflow", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /building retrieval, automation, and data products/i })).toBeVisible();
+    await expect(page.locator("h1")).toBeVisible();
     await expect(page.getByRole("link", { name: /explore ai systems/i })).toBeVisible();
     await expect(page.getByAltText(/rahul harivansh fatyal portrait/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /start a conversation/i })).toHaveAttribute("href", /^mailto:.+@.+$/);
@@ -37,8 +37,10 @@ test.describe("portfolio platform", () => {
 
   test("explorer supports search and taxonomy filtering", async ({ page }) => {
     await page.goto("/explorer");
+    await expect(page.getByRole("heading", { name: "Selected work" })).toBeVisible();
+    await page.getByRole("button", { name: /browse the full archive/i }).click();
     await page.getByLabel(/search portfolio content/i).fill("resume");
-    await expect(page.getByRole("heading", { name: "Dynamic Resume Matcher" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /resume/i }).first()).toBeVisible();
     await page.getByRole("tab", { name: "RAG" }).click();
     await expect(page.getByText(/matching items/i)).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -61,8 +63,6 @@ test.describe("portfolio platform", () => {
     await expect(page.getByRole("navigation", { name: /fit brief sections/i })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/decision/i).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /the criteria most likely to change the hiring decision/i })).toBeVisible();
-    await expect(page.getByText("Priority", { exact: true })).toBeVisible();
-    await expect(page.getByText("Evidence", { exact: true }).last()).toBeVisible();
     await expect(page.getByText(/proven strengths/i)).toBeVisible();
     await expect(page.getByText(/decision risks/i)).toBeVisible();
     await expect(page.getByText(/recommended next step/i)).toBeVisible();
@@ -132,10 +132,52 @@ test.describe("portfolio platform", () => {
   });
 
   test("detail pages expose progress, related items, and readable content", async ({ page }) => {
-    await page.goto("/project/dynamic-resume-matcher");
-    await expect(page.getByRole("heading", { name: "Architecture Canvas" })).toBeVisible();
+    const response = await page.request.get("/api/content");
+    const { items } = await response.json() as { items: Array<{ kind: string; slug: string; title: string }> };
+    const project = items.find((item) => item.kind === "project");
+    expect(project).toBeTruthy();
+    await page.goto(`/project/${project!.slug}`);
+    await expect(page.getByRole("heading", { name: project!.title })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Related Items" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("content cards open from the full card with pointer and keyboard", async ({ page }) => {
+    await page.goto("/explorer");
+    const card = page.locator('article').first();
+    const cardLink = card.getByRole("link", { name: /open/i });
+    await expect(cardLink).toBeVisible();
+    await cardLink.click({ position: { x: 20, y: 180 } });
+    await expect(page).toHaveURL(/\/(project|case-study|experiment|blog|dashboard)\//);
+
+    await page.goBack();
+    const keyboardCard = page.locator('article').first().getByRole("link", { name: /open/i });
+    await keyboardCard.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/(project|case-study|experiment|blog|dashboard)\//);
+  });
+
+  test("homepage prioritizes selected work instead of a raw capability inventory", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Capabilities, grouped by practice." })).toHaveCount(0);
+    await expect(page.getByText(/\bnodes\b/i)).toHaveCount(0);
+    await expect(page.locator("#selected-systems h2")).toBeVisible();
+  });
+
+  test("homepage does not expose CMS language to recruiters", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/editable proof signals|edit mode/i)).toHaveCount(0);
+  });
+
+  test("top-level content routes expose exactly one h1", async ({ page }) => {
+    const response = await page.request.get("/api/content");
+    const { items } = await response.json() as { items: Array<{ kind: string; slug: string }> };
+    const blog = items.find((item) => item.kind === "blog");
+    expect(blog).toBeTruthy();
+    for (const path of ["/explorer", "/timeline", "/cv", `/blog/${blog!.slug}`]) {
+      await page.goto(path);
+      await expect(page.locator("h1")).toHaveCount(1);
+    }
   });
 
   test("theme toggle and keyboard focus are available", async ({ page }) => {
@@ -169,8 +211,8 @@ test.describe("portfolio platform", () => {
     await page.getByRole("link", { name: "Resume", exact: true }).click();
     await expect(page).toHaveURL(/\/timeline#resume-downloads$/);
     await expect(page.getByRole("heading", { name: "Resume & CV Downloads" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Download Resume" })).toHaveAttribute("href", /rahul-harivansh-fatyal-resume\.pdf$/);
-    await expect(page.getByRole("link", { name: "Download CV" })).toHaveAttribute("href", /rahul-harivansh-fatyal-cv\.pdf$/);
+    await expect(page.getByRole("link", { name: "Download Resume" })).toHaveAttribute("href", /\/api\/(?:files|media)\//);
+    await expect(page.getByRole("link", { name: "Download CV" })).toHaveAttribute("href", /\/api\/(?:files|media)\//);
     await page.getByRole("link", { name: "View CV" }).click();
     await expect(page).toHaveURL(/\/cv$/);
     await expect(page.getByRole("heading", { name: "Selected Projects" })).toBeVisible();
@@ -184,7 +226,7 @@ test.describe("portfolio platform", () => {
     const text = await full.text();
     expect(text).toContain("/cv#skills");
     expect(text).toContain("/cv#projects");
-    expect(text).toContain("/documents/rahul-harivansh-fatyal-resume.pdf");
+    expect(text).toMatch(/\/api\/(?:files|media)\//);
   });
 
   test("assistant answers resume link requests with site-wide document evidence", async ({ page }) => {
@@ -197,7 +239,7 @@ test.describe("portfolio platform", () => {
     });
     expect(response.ok()).toBeTruthy();
     const text = await response.text();
-    expect(text).toContain("/documents/rahul-harivansh-fatyal-resume.pdf");
+    expect(text).toMatch(/\/api\/(?:files|media)\//);
     expect(text).toContain("/timeline#resume-downloads");
   });
 

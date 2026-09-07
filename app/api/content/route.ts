@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
+import { authOptions, isAdminSession } from "@/lib/auth";
 import { affectedContentPaths, type EditableContentKind } from "@/lib/content-paths";
 import { getExplorerItems } from "@/lib/content";
 import { safeSiteProfile } from "@/lib/safe-content";
@@ -15,7 +15,8 @@ const baseSchema = z.object({
   kind: z.enum(["project", "case-study", "experiment", "blog", "dashboard", "skill", "certification", "achievement", "timeline", "document"]),
   title: z.string().min(3),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/),
-  tags: z.array(z.string()).default([])
+  tags: z.array(z.string()).default([]),
+  visibility: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("PUBLISHED")
 });
 
 const optionalImageSchema = z
@@ -119,7 +120,8 @@ const achievementSchema = z.object({
   imageRatio: z.enum(["1/1", "4/3", "16/9"]).default("4/3"),
   imageFocus: z.string().default("50% 50%"),
   highlighted: z.boolean().default(false),
-  sortOrder: z.number().int().min(0).default(0)
+  sortOrder: z.number().int().min(0).default(0),
+  visibility: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("PUBLISHED")
 });
 
 const timelineSchema = z.object({
@@ -143,7 +145,8 @@ const documentSchema = z.object({
     .refine((value) => value.startsWith("/") || /^https?:\/\//.test(value), {
       message: "Use an uploaded /api/files path or a hosted document URL."
     }),
-  versionLabel: z.string().optional().or(z.literal(""))
+  versionLabel: z.string().optional().or(z.literal("")),
+  visibility: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("PUBLISHED")
 });
 
 const siteProfileSchema = z.object({
@@ -224,6 +227,10 @@ function publishedResponse(item: unknown, kind: EditableContentKind, slug?: stri
   );
 }
 
+function publicationFields(visibility: "DRAFT" | "PUBLISHED" | "ARCHIVED") {
+  return { visibility, publishedAt: visibility === "PUBLISHED" ? new Date() : null };
+}
+
 export async function GET() {
   return NextResponse.json({ items: await getExplorerItems() });
 }
@@ -232,6 +239,9 @@ async function publishContent(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isAdminSession(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ error: "DATABASE_URL is required for CMS writes." }, { status: 503 });
@@ -248,13 +258,12 @@ async function publishContent(request: Request) {
     void _kind;
     const published = {
       ...data,
+      ...publicationFields(data.visibility),
       imageUrl: imageUrl || null,
       githubUrl: githubUrl || null,
       demoUrl: demoUrl || null,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
-      visibility: "PUBLISHED" as const,
-      publishedAt: new Date()
     };
     let oldSlug: string | undefined;
     if (id) {
@@ -263,18 +272,14 @@ async function publishContent(request: Request) {
     }
     const project = id
       ? await prisma.project.update({ where: { id }, data: published })
-      : await prisma.project.upsert({
-          where: { slug: data.slug },
-          update: published,
-          create: published
-        });
+      : await prisma.project.create({ data: published });
     return publishedResponse(project, "project", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "case-study") {
     const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
-    const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
+    const published = { ...data, imageUrl: imageUrl || null, ...publicationFields(data.visibility) };
     let oldSlug: string | undefined;
     if (id) {
       const existing = await prisma.caseStudy.findUnique({ where: { id }, select: { slug: true } });
@@ -282,18 +287,14 @@ async function publishContent(request: Request) {
     }
     const caseStudy = id
       ? await prisma.caseStudy.update({ where: { id }, data: published })
-      : await prisma.caseStudy.upsert({
-          where: { slug: data.slug },
-          update: published,
-          create: published
-        });
+      : await prisma.caseStudy.create({ data: published });
     return publishedResponse(caseStudy, "case-study", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "experiment") {
     const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
-    const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
+    const published = { ...data, imageUrl: imageUrl || null, ...publicationFields(data.visibility) };
     let oldSlug: string | undefined;
     if (id) {
       const existing = await prisma.experiment.findUnique({ where: { id }, select: { slug: true } });
@@ -301,18 +302,14 @@ async function publishContent(request: Request) {
     }
     const experiment = id
       ? await prisma.experiment.update({ where: { id }, data: published })
-      : await prisma.experiment.upsert({
-          where: { slug: data.slug },
-          update: published,
-          create: published
-        });
+      : await prisma.experiment.create({ data: published });
     return publishedResponse(experiment, "experiment", data.slug, oldSlug);
   }
 
   if (parsed.data.kind === "blog") {
     const { kind: _kind, id, imageUrl, ...data } = parsed.data;
     void _kind;
-    const published = { ...data, imageUrl: imageUrl || null, visibility: "PUBLISHED" as const, publishedAt: new Date() };
+    const published = { ...data, imageUrl: imageUrl || null, ...publicationFields(data.visibility) };
     let oldSlug: string | undefined;
     if (id) {
       const existing = await prisma.blog.findUnique({ where: { id }, select: { slug: true } });
@@ -320,11 +317,7 @@ async function publishContent(request: Request) {
     }
     const blog = id
       ? await prisma.blog.update({ where: { id }, data: published })
-      : await prisma.blog.upsert({
-          where: { slug: data.slug },
-          update: published,
-          create: published
-        });
+      : await prisma.blog.create({ data: published });
     return publishedResponse(blog, "blog", data.slug, oldSlug);
   }
 
@@ -350,7 +343,7 @@ async function publishContent(request: Request) {
   }
 
   if (parsed.data.kind === "achievement") {
-    const { kind: _kind, id, awardedAt, proofUrl, imageUrl, imageFocus, ...data } = parsed.data;
+    const { kind: _kind, id, awardedAt, proofUrl, imageUrl, imageFocus, visibility, ...data } = parsed.data;
     void _kind;
     const achievementData = {
       ...data,
@@ -358,8 +351,7 @@ async function publishContent(request: Request) {
       proofUrl: proofUrl || null,
       imageUrl: imageUrl || null,
       imageFocus: imageFocus || "50% 50%",
-      visibility: "PUBLISHED" as const,
-      publishedAt: new Date()
+      ...publicationFields(visibility)
     };
     const achievement = id
       ? await prisma.achievement.update({ where: { id }, data: achievementData })
@@ -375,7 +367,7 @@ async function publishContent(request: Request) {
   }
 
   if (parsed.data.kind === "document") {
-    const { kind: _kind, documentKind, versionLabel, ...data } = parsed.data;
+    const { kind: _kind, documentKind, versionLabel, visibility, ...data } = parsed.data;
     void _kind;
     const document = await prisma.portfolioDocument.upsert({
       where: { kind: documentKind },
@@ -383,15 +375,13 @@ async function publishContent(request: Request) {
         ...data,
         kind: documentKind,
         versionLabel: versionLabel || null,
-        visibility: "PUBLISHED",
-        publishedAt: new Date()
+        ...publicationFields(visibility)
       },
       create: {
         ...data,
         kind: documentKind,
         versionLabel: versionLabel || null,
-        visibility: "PUBLISHED",
-        publishedAt: new Date()
+        ...publicationFields(visibility)
       }
     });
     return publishedResponse(document, "document");
@@ -429,7 +419,7 @@ async function publishContent(request: Request) {
 
   const { kind: _kind, id, ...data } = parsed.data;
   void _kind;
-  const published = { ...data, visibility: "PUBLISHED" as const, publishedAt: new Date() };
+  const published = { ...data, ...publicationFields(data.visibility) };
   let oldSlug: string | undefined;
   if (id) {
     const existing = await prisma.dashboard.findUnique({ where: { id }, select: { slug: true } });
@@ -444,14 +434,8 @@ async function publishContent(request: Request) {
           imageUrl: published.imageUrl || null
         }
       })
-    : await prisma.dashboard.upsert({
-        where: { slug: data.slug },
-        update: {
-          ...published,
-          embedUrl: published.embedUrl || null,
-          imageUrl: published.imageUrl || null
-        },
-        create: {
+    : await prisma.dashboard.create({
+        data: {
           ...published,
           embedUrl: published.embedUrl || null,
           imageUrl: published.imageUrl || null
@@ -502,10 +486,21 @@ export async function POST(request: Request) {
       );
     }
 
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      return NextResponse.json(
+        {
+          error: "A record with that slug already exists.",
+          message: "Choose a different slug or edit the existing record.",
+          requestId,
+        },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to publish content.",
-        message: error instanceof Error ? error.message : "The server could not save the content.",
+        message: "The server could not save the content.",
         requestId,
       },
       { status: 500 },
@@ -519,6 +514,9 @@ export async function DELETE(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isAdminSession(session)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "DATABASE_URL is required for CMS deletes." }, { status: 503 });
@@ -568,7 +566,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json(
       {
         error: "Failed to delete content.",
-        message: error instanceof Error ? error.message : "The server could not delete the content.",
+        message: "The server could not delete the content.",
         requestId,
       },
       { status: 500 },

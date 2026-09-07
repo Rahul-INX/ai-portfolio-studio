@@ -1,4 +1,5 @@
 export type ContentKind = "project" | "case-study" | "experiment" | "blog" | "dashboard";
+export type ContentVisibility = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
 export type Metric = {
   label: string;
@@ -33,6 +34,7 @@ export type SafeProject = {
   startDate?: string;
   endDate?: string;
   publishedAt?: string;
+  visibility?: ContentVisibility;
 };
 
 export type SafeCaseStudy = {
@@ -48,6 +50,7 @@ export type SafeCaseStudy = {
   tags: string[];
   imageUrl?: string;
   publishedAt?: string;
+  visibility?: ContentVisibility;
 };
 
 export type SafeExperiment = {
@@ -65,6 +68,7 @@ export type SafeExperiment = {
   metrics: Metric[];
   imageUrl?: string;
   publishedAt?: string;
+  visibility?: ContentVisibility;
 };
 
 export type SafeBlog = {
@@ -80,6 +84,7 @@ export type SafeBlog = {
   seoSummary: string;
   imageUrl?: string;
   publishedAt?: string;
+  visibility?: ContentVisibility;
 };
 
 export type SafeDashboard = {
@@ -92,6 +97,7 @@ export type SafeDashboard = {
   imageUrl?: string;
   tags: string[];
   publishedAt?: string;
+  visibility?: ContentVisibility;
 };
 
 export type ExplorerItem = SafeProject | SafeCaseStudy | SafeExperiment | SafeBlog | SafeDashboard;
@@ -135,6 +141,7 @@ export type AchievementSignal = {
   highlighted: boolean;
   sortOrder: number;
   publishedAt?: Date | string | null;
+  visibility?: ContentVisibility;
 };
 
 export type PortfolioDocumentKind = "RESUME" | "CV";
@@ -147,6 +154,7 @@ export type PortfolioDocument = {
   fileUrl: string;
   versionLabel?: string | null;
   publishedAt?: Date | string | null;
+  visibility?: ContentVisibility;
 };
 
 export type SiteProfile = {

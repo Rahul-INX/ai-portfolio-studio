@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions, isAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -43,5 +45,37 @@ export async function GET(
       { error: "The requested file is temporarily unavailable." },
       { status: 503 },
     );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminSession(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await params;
+  const url = `/api/files/${encodeURIComponent(id)}`;
+  const references = await Promise.all([
+    prisma.project.count({ where: { imageUrl: url } }),
+    prisma.caseStudy.count({ where: { imageUrl: url } }),
+    prisma.experiment.count({ where: { imageUrl: url } }),
+    prisma.blog.count({ where: { imageUrl: url } }),
+    prisma.dashboard.count({ where: { imageUrl: url } }),
+    prisma.achievement.count({ where: { imageUrl: url } }),
+    prisma.portfolioDocument.count({ where: { fileUrl: url } }),
+    prisma.siteProfile.count({ where: { profileImageUrl: url } }),
+  ]);
+  if (references.some(Boolean)) {
+    return NextResponse.json({ error: "Remove this file from its content record before deleting it." }, { status: 409 });
+  }
+
+  try {
+    await prisma.storedFile.delete({ where: { id } });
+    return NextResponse.json({ deleted: true });
+  } catch {
+    return NextResponse.json({ error: "File not found." }, { status: 404 });
   }
 }

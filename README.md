@@ -10,7 +10,7 @@ Reusable personal portfolio and evidence hub with JD-derived recruiter matching 
 - Prisma + PostgreSQL for dynamic content models
 - NextAuth credentials provider for the admin CMS
 - Vercel-ready deployment shape
-- PostgreSQL-backed image and document uploads through `DATABASE_URL`
+- Private Google Drive media storage with stable app-served URLs
 
 ## Local Setup
 
@@ -28,7 +28,30 @@ npm.cmd run prisma:push
 npm.cmd run prisma:seed
 ```
 
-Uploaded images and documents are stored in PostgreSQL through `DATABASE_URL` and served from `/api/files/[id]`. No external media-storage credentials are required. Uploads must be 4 MB or smaller to remain below Vercel's request-body limit.
+Portfolio records stay in PostgreSQL. Images and documents can live in a private,
+app-managed Google Drive library and are served through stable `/api/media/[id]`
+URLs. Existing PostgreSQL `/api/files/[id]` media remains supported during
+migration.
+
+To connect Drive, enable the Google Drive API, create a Web OAuth client, and set:
+
+```dotenv
+GOOGLE_DRIVE_CLIENT_ID=
+GOOGLE_DRIVE_CLIENT_SECRET=
+GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000/api/admin/google-drive/callback
+```
+
+Add the redirect URI exactly to the OAuth client's authorized redirect URIs. For
+production, use the deployed origin instead, for example
+`https://your-domain.example/api/admin/google-drive/callback`, and set the same
+value in the deployment environment. Then open **Admin CMS -> Media storage ->
+Connect Google Drive**, select the owner account, and approve access.
+
+Drive uploads use browser-to-Drive resumable sessions and support files up to the
+CMS policy limit of 100 MB. The app requests the narrow `drive.file` scope, keeps
+Drive files private, and stores the refresh token encrypted with
+`AI_KEYS_ENCRYPTION_KEY`. Configure and verify the production OAuth environment
+before migrating shared-database media or deleting PostgreSQL copies.
 
 ## Content Safety
 
@@ -68,5 +91,8 @@ Public pages read from Prisma when `DATABASE_URL` is configured and fall back to
 5. Update **Site Profile** first. This drives the visible owner name, role, contact details, metadata, manifest, assistant identity, Job-Fit wording, CV heading, and AI-readable feeds.
 6. Replace projects, timeline records, skills, certifications, documents, writing, case studies, experiments, and dashboards through the studio.
 7. Upload the new portrait and resume/CV documents before publishing.
+8. If using Google Drive, connect it before uploading media and complete the
+   explicit CMS migration only after the production callback and environment are
+   verified.
 
 Authenticated users can enable edit mode from public pages. Hero fields edit in context; projects, skills, and timeline records expose contextual edit links that open the existing studio with the correct record selected.

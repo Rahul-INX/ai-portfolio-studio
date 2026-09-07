@@ -5,12 +5,13 @@ import { SectionHeading } from "@/components/section-heading";
 import { SiteShell } from "@/components/site-shell";
 import { getCertifications, getPortfolioDocuments, getProjects, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
 import { InlineProfileText } from "@/components/inline-profile-text";
+import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export const metadata: Metadata = { title: "Detailed CV", description: "Detailed public portfolio CV with projects, skills, experience, and certifications." };
 
 function SectionShell({ id, title, children }: { id: string; title: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section id={id} className="surface scroll-mt-24 rounded-lg p-6">
+    <section id={id} className="surface min-w-0 scroll-mt-24 rounded-lg p-6">
       <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
@@ -23,11 +24,16 @@ export default async function CvPage() {
   ]);
   const resume = documents.find((item) => item.kind === "RESUME");
   const cv = documents.find((item) => item.kind === "CV");
+  const [projectsWithImpactHtml, timelineWithHtml] = await Promise.all([
+    Promise.all(projects.map(async (project) => ({ ...project, impactHtml: await renderMarkdownToHtml(project.businessImpact) }))),
+    Promise.all(timeline.map(async (item) => ({ ...item, descriptionHtml: await renderMarkdownToHtml(item.description) })))
+  ]);
 
   return (
     <SiteShell profile={profile}>
       <article className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeading
+          level="h1"
           eyebrow={profile.cvHeadingEyebrow}
           title={profile.name}
           description={profile.heroSummary}
@@ -87,11 +93,11 @@ export default async function CvPage() {
 
           <SectionShell id="projects" title={profile.cvProjectsTitle}>
             <div className="space-y-4">
-              {projects.map((project) => (
+              {projectsWithImpactHtml.map((project) => (
                 <article key={project.title} className="rounded-md border hairline p-4">
                   <h3 className="font-semibold">{project.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{project.summary}</p>
-                  <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{project.businessImpact}</p>
+                  <div className="prose-premium mt-2 text-xs leading-5 text-[var(--muted)]" dangerouslySetInnerHTML={{ __html: project.impactHtml }} />
                 </article>
               ))}
             </div>
@@ -99,12 +105,12 @@ export default async function CvPage() {
 
           <SectionShell id="experience" title={profile.cvExperienceTitle}>
             <div className="space-y-4">
-              {timeline.map((item) => (
+              {timelineWithHtml.map((item) => (
                 <article key={item.title}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="font-semibold">{item.title}</h3><span className="text-xs text-[var(--muted)]">{item.period}</span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.description}</p>
+                  <div className="prose-premium mt-2 text-sm leading-6 text-[var(--muted)]" dangerouslySetInnerHTML={{ __html: item.descriptionHtml }} />
                 </article>
               ))}
             </div>

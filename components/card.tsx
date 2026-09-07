@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { ExplorerItem } from "@/lib/types";
 import { ContextualEditLink } from "@/components/contextual-edit-link";
+import { useEditMode } from "@/components/edit-mode-provider";
 import { InlineContentField } from "@/components/inline-content-field";
+import { markdownToPlainText } from "@/lib/markdown";
 
 const kindLabel: Record<ExplorerItem["kind"], string> = {
   project: "Project",
@@ -26,8 +30,11 @@ const kindStyle: Record<ExplorerItem["kind"], { bg: string; text: string; border
 };
 
 export function ContentCard({ item }: { item: ExplorerItem }) {
+  const { editMode } = useEditMode();
+  const href = `/${item.kind}/${item.slug}`;
   const style = kindStyle[item.kind];
   const summary = "summary" in item ? item.summary : item.excerpt;
+  const readableSummary = markdownToPlainText(summary);
   const projectMetric = item.kind === "project" ? item.metrics.find((metric) => metric.accent) ?? item.metrics[0] : undefined;
   const evidence =
     item.kind === "project" ? item.businessImpact :
@@ -37,7 +44,11 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
   const stack = item.kind === "project" ? item.techStack : item.tags;
 
   return (
-    <article className="surface group flex min-h-[23rem] flex-col rounded-2xl p-6 transition duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]">
+    <article
+      aria-label={`Open ${item.title}`}
+      className="surface group relative flex min-h-[23rem] flex-col rounded-lg p-6 transition duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]"
+    >
+      {!editMode ? <Link href={href} aria-label={`Open ${item.title}`} className="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2" /> : null}
       <div className="flex items-center justify-between gap-4">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-xs uppercase tracking-[0.14em] ${style.bg} ${style.text} ${style.border}`}
@@ -47,20 +58,14 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
         </span>
         <div className="flex items-center gap-2">
         <ContextualEditLink kind={item.kind} record={item.slug} label={item.title} />
-        <Link
-          href={`/${item.kind}/${item.slug}`}
-          aria-label={`Open ${item.title}`}
-          className="grid h-9 w-9 place-items-center rounded-md border hairline transition hover:border-cobalt-500"
-        >
-          <ArrowUpRight aria-hidden className="h-4 w-4" />
-        </Link>
+        <ArrowUpRight aria-hidden className="h-4 w-4 transition group-hover:text-[var(--accent)]" />
         </div>
       </div>
-      <div className="mt-6 text-2xl font-semibold tracking-[-0.025em]">
+      <h3 className="mt-6 text-2xl font-semibold tracking-[-0.025em]">
         <InlineContentField item={item} field="title" label={`${item.title} title`} value={item.title} />
-      </div>
+      </h3>
       <div className="mt-3 line-clamp-3 text-sm leading-6 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
-        <InlineContentField item={item} field={item.kind === "blog" ? "excerpt" : "summary"} label={`${item.title} summary`} value={summary} multiline />
+        <InlineContentField item={item} field={item.kind === "blog" ? "excerpt" : "summary"} label={`${item.title} summary`} value={summary} displayValue={readableSummary} multiline />
       </div>
       {projectMetric ? (
         <div className="mt-5 border-l-2 border-[var(--signal)] pl-3">
@@ -69,7 +74,7 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
         </div>
       ) : evidence ? (
         <p className="mt-5 line-clamp-2 border-l-2 border-[var(--accent)] pl-3 text-xs leading-5 text-[var(--muted)]">
-          {evidence}
+          {markdownToPlainText(evidence)}
         </p>
       ) : null}
       <div className="mt-auto pt-6">

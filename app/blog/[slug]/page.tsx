@@ -33,7 +33,7 @@ export default async function BlogPage({ params }: { params: Promise<{ slug: str
   const related = items
     .filter((candidate) => candidate.slug !== item.slug && candidate.tags.some((tag) => item.tags.includes(tag)))
     .slice(0, 4);
-  const html = await renderMarkdownToHtml(item.content);
+  const html = await renderMarkdownToHtml(item.content.replace(/^#\s+.*(?:\r?\n|$)/, ""));
   return (
     <SiteShell>
       <ReadingProgress />

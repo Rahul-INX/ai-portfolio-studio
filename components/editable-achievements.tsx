@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { readApiResponse } from "@/lib/api-response";
+import { uploadPortfolioMedia } from "@/lib/media-upload";
 import { resolvePortfolioMedia } from "@/lib/media";
 import { useEditMode } from "@/components/edit-mode-provider";
 import type { AchievementSignal } from "@/lib/types";
@@ -71,11 +72,7 @@ function formatDate(value?: Date | string | null) {
 }
 
 async function uploadImage(file: File): Promise<string | null> {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await fetch("/api/media", { method: "POST", body: form });
-  const payload = await readApiResponse<{ url?: string }>(response);
-  return payload.url ?? null;
+  return uploadPortfolioMedia(file, "achievements", "/api/media");
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -362,6 +359,8 @@ function AchievementCard({
 
   // ── Expand/collapse summary state ──────────────────────────────────────────
   const [expanded, setExpanded] = useState(false);
+  const [failedImageUrl, setFailedImageUrl] = useState<string>();
+  const imageFailed = failedImageUrl === draft.imageUrl;
   const COLLAPSE_LINES = 3;
   const lines = (draft.summary || "").split("\n");
   const needsExpand = lines.length > COLLAPSE_LINES || (draft.summary || "").length > 180;
@@ -409,7 +408,7 @@ function AchievementCard({
   return (
     <article className={`surface overflow-hidden rounded-2xl transition-all ${editMode ? "ring-1 ring-[var(--line-strong)]" : ""}`}>
       {/* ── Image area ── */}
-      {draft.imageUrl ? (
+      {draft.imageUrl && !imageFailed ? (
         <div
           ref={imgContainerRef}
           className={`relative overflow-hidden ${aspectClass} ${editMode ? "cursor-grab select-none" : ""} ${dragging ? "cursor-grabbing" : ""}`}
@@ -426,6 +425,7 @@ function AchievementCard({
             src={resolvePortfolioMedia(draft.imageUrl)}
             alt={`${draft.title} proof image`}
             draggable={false}
+            onError={() => setFailedImageUrl(draft.imageUrl)}
             className="h-full w-full object-cover transition-none"
             style={{ objectPosition: draft.imageFocus }}
           />
