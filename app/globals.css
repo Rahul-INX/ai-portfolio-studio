@@ -91,10 +91,25 @@ a {
 }
 
 .display-title {
-  font-size: clamp(2.65rem, 7vw, 5.8rem);
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
   font-weight: 600;
   letter-spacing: -0.055em;
-  line-height: 0.98;
+  line-height: 1.04;
+}
+
+.hero-ambient::before {
+  position: absolute;
+  inset: -35% -15%;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 25% 45%, color-mix(in srgb, var(--accent), transparent 89%), transparent 31%),
+    radial-gradient(circle at 78% 30%, color-mix(in srgb, #4779d4, transparent 93%), transparent 27%);
+  animation: hero-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes hero-drift {
+  to { transform: translate3d(2%, 2%, 0) scale(1.04); }
 }
 
 .text-balance {

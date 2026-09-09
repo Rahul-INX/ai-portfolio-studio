@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getSiteProfile } from "@/lib/content";
+import { publicProfileCopy, publicProfileSummary } from "@/lib/public-copy";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -28,10 +29,10 @@ export default async function OpenGraphImage() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ fontSize: 76, lineHeight: 1.05, fontWeight: 700 }}>{profile.name}</div>
-          <div style={{ maxWidth: 880, color: "#aeb9aa", fontSize: 30, lineHeight: 1.35 }}>{profile.seoDescription}</div>
+          <div style={{ maxWidth: 880, color: "#aeb9aa", fontSize: 30, lineHeight: 1.35 }}>{publicProfileCopy(profile.seoDescription, publicProfileSummary)}</div>
         </div>
         <div style={{ display: "flex", gap: 18, color: "#79b8a7", fontSize: 24 }}>
-          <span>{profile.ogCenterLabel}</span><span>/</span><span>{profile.ogFooterLabel}</span>
+          <span>{profile.ogCenterLabel}</span><span>/</span><span>{publicProfileCopy(profile.ogFooterLabel, "Recruiter-ready navigation")}</span>
         </div>
       </div>
     ),

@@ -7,6 +7,7 @@ import { SiteShell } from "@/components/site-shell";
 import { getExplorerItems, getProjects } from "@/lib/content";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 import { resolvePortfolioMedia } from "@/lib/media";
+import { projectProof } from "@/lib/project-evidence";
 
 export async function generateStaticParams() {
   const projects = await getProjects();
@@ -28,6 +29,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const [projects, items] = await Promise.all([getProjects(), getExplorerItems()]);
   const project = projects.find((item) => item.slug === slug);
   if (!project) notFound();
+  const proof = projectProof(project);
   const related = items
     .filter((item) => item.slug !== project.slug && item.tags.some((tag) => project.tags.includes(tag)))
     .slice(0, 4);
@@ -65,6 +67,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <p className="mt-5 max-w-3xl text-lg leading-8 text-[color-mix(in_srgb,var(--foreground),transparent_26%)]">
             {project.subtitle}
           </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--muted)]">Public proof</span>
+            <span className={proof.tone === "strong" ? "font-semibold text-[var(--accent)]" : "font-semibold text-[var(--muted)]"}>{proof.label}</span>
+            {project.demoUrl ? <a href={project.demoUrl} target="_blank" rel="noreferrer" className="rounded-md border hairline px-3 py-2 font-semibold hover:border-[var(--accent)]">Open live demo</a> : null}
+            {project.githubUrl ? <a href={project.githubUrl} target="_blank" rel="noreferrer" className="rounded-md border hairline px-3 py-2 font-semibold hover:border-[var(--accent)]">View repository</a> : null}
+          </div>
           {project.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -91,6 +99,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             ))}
           </section>
+          {project.metrics.length ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Portfolio-reported metrics. Validate material claims against linked public evidence or ask for supporting context.</p> : null}
           <section id="architecture" className="mt-6 surface rounded-lg p-6 scroll-mt-24">
             <h2 className="text-xl font-semibold">Architecture Canvas</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-3">

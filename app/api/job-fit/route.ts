@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { buildRequirementAlignment, deterministicJobFit, selectRelevantJobEvidence } from "@/lib/job-fit";
+import { deterministicJobFit } from "@/lib/job-fit";
 import { getJobFitSettings } from "@/lib/job-fit-settings";
-import { runResumeMatchAgent } from "@/lib/resume-match-agent";
+import { buildJobFitIntelligenceResult, withFinalJobFitAudit } from "@/lib/job-fit-intelligence";
+import { runJobFitResearch } from "@/lib/job-fit-research-workflow";
+import { persistJobFitInquiry } from "@/lib/job-fit-store";
+import { runResumeMatchAgent, shouldUseDeterministicFallback } from "@/lib/resume-match-agent";
 import { evidenceBlock, gatherAllPortfolioEvidence } from "@/lib/site-context";
 import { getSiteProfile } from "@/lib/content";
+import { start } from "workflow/api";
+import { jobFitSessionFrom } from "@/lib/job-fit-session";
 
 export const runtime = "nodejs";
 
@@ -22,7 +27,13 @@ function extensionOf(filename: string) {
 }
 
 function normalizeText(value: string) {
-  return value.replace(/\u0000/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/\u0000/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function textFromFile(file: File) {
@@ -37,16 +48,15 @@ async function textFromFile(file: File) {
 
   const bytes = Buffer.from(await file.arrayBuffer());
 
-  if (ext === ".txt") {
-    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  }
+  const contentType = allowedFileTypes.get(ext)!;
+  if (ext === ".txt") return { text: new TextDecoder("utf-8", { fatal: false }).decode(bytes), attachment: { fileName: file.name, contentType, data: bytes } };
 
   if (ext === ".pdf") {
     const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: bytes });
     try {
       const parsed = await parser.getText();
-      return parsed.text ?? "";
+      return { text: parsed.text ?? "", attachment: { fileName: file.name, contentType, data: bytes } };
     } finally {
       await parser.destroy();
     }
@@ -54,7 +64,7 @@ async function textFromFile(file: File) {
 
   const mammoth = await import("mammoth");
   const parsed = await mammoth.extractRawText({ buffer: bytes });
-  return parsed.value;
+  return { text: parsed.value, attachment: { fileName: file.name, contentType, data: bytes } };
 }
 
 function responseError(message: string, status = 400) {
@@ -72,10 +82,11 @@ export async function POST(request: Request) {
   const rawText = typeof formData.get("jdText") === "string" ? String(formData.get("jdText")) : "";
   const file = formData.get("jdFile");
   let fileText = "";
+  let attachment: { fileName: string; contentType: string; data: Buffer } | undefined;
 
   try {
     if (file instanceof File && file.size > 0) {
-      fileText = await textFromFile(file);
+      const parsed = await textFromFile(file); fileText = parsed.text; attachment = parsed.attachment;
     }
   } catch (error) {
     return responseError(error instanceof Error ? error.message : "Could not read the attached JD file.");
@@ -94,23 +105,30 @@ export async function POST(request: Request) {
     getJobFitSettings(),
     getSiteProfile()
   ]);
-  const evidence = selectRelevantJobEvidence(jdText, siteEvidence);
-  const alignmentNotes = buildRequirementAlignment(jdText, siteEvidence);
-  const fallback = deterministicJobFit(jdText, evidence, siteEvidence);
-  if (!evidence.length) {
-    return NextResponse.json({ result: fallback });
-  }
-
+  const coreIntelligence = buildJobFitIntelligenceResult(jdText, siteEvidence);
+  const intelligence = { ...coreIntelligence, research: { status: "pending" as const, citations: [], insights: [], note: "Research is queued and will update this retained inquiry with cited current evidence." } };
+  const finish = async (result: ReturnType<typeof deterministicJobFit>, fallbackReason?: string) => {
+    const finalIntelligence = withFinalJobFitAudit(intelligence, result);
+    const sessionId = jobFitSessionFrom(request) || crypto.randomUUID();
+    const inquiry = await persistJobFitInquiry({ sessionId, jdText, fileName: file instanceof File ? file.name : undefined, attachment, result: finalIntelligence });
+    if (inquiry.persisted) {
+      try { await start(runJobFitResearch, [inquiry.id]); }
+      catch { /* The portfolio-only assessment remains available if durable research cannot be scheduled. */ }
+    }
+    const response = NextResponse.json({ result, intelligence: finalIntelligence, inquiry, ...(fallbackReason ? { fallbackReason } : {}) });
+    response.cookies.set("job_fit_session", sessionId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 365 * 24 * 60 * 60 });
+    return response;
+  };
   const agentRun = await runResumeMatchAgent({
     ownerName: profile.name,
     jdText,
-    evidence,
-    evidenceText: evidenceBlock(evidence),
+    evidence: siteEvidence,
+    evidenceText: evidenceBlock(siteEvidence),
     timeoutMs: settings.fallbackTimeoutSeconds * 1_000
   });
 
   if (agentRun.ok) {
-    return NextResponse.json({ result: { ...agentRun.result, alignmentNotes } });
+    return finish(agentRun.result);
   }
 
   console.warn("[resume-match-agent] Run failed.", {
@@ -118,11 +136,9 @@ export async function POST(request: Request) {
     detail: agentRun.detail
   });
 
-  if (settings.deterministicFallbackEnabled) {
-    return NextResponse.json({
-      result: fallback,
-      fallbackReason: agentRun.reason
-    });
+  if (shouldUseDeterministicFallback(agentRun.reason, settings.deterministicFallbackEnabled)) {
+    const fallback = deterministicJobFit(jdText, siteEvidence, siteEvidence);
+    return finish(fallback, agentRun.reason);
   }
 
   const message =
@@ -130,5 +146,5 @@ export async function POST(request: Request) {
       ? `The Resume Match Specialist exceeded the ${settings.fallbackTimeoutSeconds}-second timeout.`
       : `The Resume Match Specialist could not return a grounded result (${agentRun.reason}).`;
 
-  return responseError(`${message} Deterministic fallback is disabled.`, 503);
+  return responseError(`${message} No rules-based score was substituted.`, 503);
 }

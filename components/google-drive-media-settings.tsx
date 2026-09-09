@@ -18,7 +18,14 @@ export function GoogleDriveMediaSettings() {
     try { const value = await readApiResponse<State>(await fetch("/api/admin/google-drive")); setState(value); setMessage(""); return value; }
     catch (error) { setMessage(error instanceof Error ? error.message : "Media storage could not be loaded."); return null; }
   }
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/admin/google-drive", { signal: controller.signal })
+      .then((response) => readApiResponse<State>(response))
+      .then((value) => { setState(value); setMessage(""); })
+      .catch((error) => { if (error instanceof Error && error.name !== "AbortError") setMessage(error.message); });
+    return () => controller.abort();
+  }, []);
 
   async function verify() {
     setBusy(true); setMessage("Checking your Google Drive connection...");

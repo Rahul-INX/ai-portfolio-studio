@@ -42,7 +42,7 @@ async function main() {
     create: {
       id: "main",
       deterministicFallbackEnabled: true,
-      fallbackTimeoutSeconds: 45
+      fallbackTimeoutSeconds: 120
     }
   });
 

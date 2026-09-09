@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function LoginForm() {
+export function LoginForm({ googleEnabled, credentialsEnabled }: { googleEnabled: boolean; credentialsEnabled: boolean }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,25 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-4">
+    <div className="mt-6">
+      {googleEnabled ? (
+        <>
+          <button
+            type="button"
+            onClick={() => void signIn("google", { callbackUrl: "/admin" })}
+            className="flex h-11 w-full items-center justify-center gap-3 rounded-md bg-[var(--foreground)] px-4 text-sm font-semibold text-[var(--background)]"
+          >
+            <span aria-hidden className="text-base font-bold">G</span>
+            Continue with Google
+          </button>
+          {credentialsEnabled ? <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+            <span className="h-px flex-1 bg-[var(--border)]" />
+            Recovery login
+            <span className="h-px flex-1 bg-[var(--border)]" />
+          </div> : null}
+        </>
+      ) : null}
+      {credentialsEnabled ? <form onSubmit={submit} className="space-y-4">
       <label className="block">
         <span className="text-sm font-medium">Email</span>
         <input
@@ -56,6 +74,7 @@ export function LoginForm() {
       >
         {loading ? "Signing in..." : "Sign in"}
       </button>
-    </form>
+      </form> : null}
+    </div>
   );
 }

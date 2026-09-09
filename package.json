@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "node scripts/dev-local.mjs",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint .",
@@ -14,6 +15,7 @@
     "snapshot:worktree": "powershell -ExecutionPolicy Bypass -File scripts/worktree-snapshot.ps1 -OutputPath worktree-snapshot.json",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "prisma:push:local": "node scripts/prisma-local-push.mjs",
     "prisma:seed": "tsx prisma/seed.ts",
     "media:cleanup": "tsx scripts/cleanup-unused-media.ts",
     "cv:pdf": "tsx scripts/generate-cv-pdf.ts"
@@ -40,6 +42,7 @@
     "remark-rehype": "^11.1.2",
     "tsx": "^4.19.4",
     "unified": "^11.0.5",
+    "workflow": "^4.8.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

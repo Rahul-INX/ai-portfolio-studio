@@ -9,8 +9,8 @@ import { InlineProfileText } from "@/components/inline-profile-text";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export const metadata: Metadata = {
-  title: "Resume and Timeline",
-  description: "Structured skills, certifications, and professional growth timeline for AI engineering."
+  title: "Resume and Journey",
+  description: "Structured skills, certifications, projects, and learning progression for AI engineering."
 };
 
 export default async function TimelinePage() {
@@ -32,6 +32,7 @@ export default async function TimelinePage() {
 
   const resume = documents.find((item) => item.kind === "RESUME");
   const cv = documents.find((item) => item.kind === "CV");
+  const skillGroups = Object.groupBy(skills, (skill) => skill.category);
   return (
     <SiteShell profile={profile}>
       <section id="timeline" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-12 sm:px-6 lg:px-8">
@@ -91,14 +92,18 @@ export default async function TimelinePage() {
               <h2 id="skills" className="scroll-mt-24 text-lg font-semibold">
                 <InlineProfileText profile={profile} field="skillsTitle" label="Skills title" value={profile.skillsTitle} />
               </h2>
-              <div className="mt-5 space-y-4">
-                {skills.map((skill) => (
-                  <div id={`skill-${skill.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`} className="scroll-mt-24" key={skill.name}>
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span>{skill.name}</span>
-                      <span className="font-mono text-xs text-[var(--muted)]">{skill.category}</span>
+              <div className="mt-5 space-y-5">
+                {Object.entries(skillGroups).map(([category, categorySkills]) => (
+                  <section key={category}>
+                    <h3 className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--muted)]">{category}</h3>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {categorySkills?.map((skill) => (
+                        <span id={`skill-${skill.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`} className="scroll-mt-24 rounded-full border hairline px-3 py-1.5 text-sm" key={skill.name}>
+                          {skill.name}
+                        </span>
+                      ))}
                     </div>
-                  </div>
+                  </section>
                 ))}
               </div>
               <div className="mt-8 border-t hairline pt-6">
@@ -114,6 +119,7 @@ export default async function TimelinePage() {
                     >
                       <p className="text-sm font-medium">{item.title}</p>
                       <p className="mt-1 text-xs text-[var(--muted)]">{item.issuer}</p>
+                      {item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-[var(--accent)]">Verify credential</a> : null}
                     </div>
                   ))}
                 </div>

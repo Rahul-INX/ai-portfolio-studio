@@ -5,13 +5,22 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function publicIdentity(page: import("@playwright/test").Page) {
+  return {
+    brand: (await page.locator('header a[aria-label="Home"]').textContent())?.replace(/\s+/g, " ").trim(),
+    emails: await page.locator('header a[href^="mailto:"]').evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    phones: await page.locator('header a[href^="tel:"]').evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    locations: await page.locator("header span.inline-flex").evaluateAll((spans) => spans.map((span) => span.textContent?.replace(/\s+/g, " ").trim()))
+  };
+}
+
 test.describe("portfolio platform", () => {
   test("home renders premium product shell without layout overflow", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("h1")).toBeVisible();
     await expect(page.getByRole("link", { name: /explore ai systems/i })).toBeVisible();
     await expect(page.getByAltText(/rahul harivansh fatyal portrait/i).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /start a conversation/i })).toHaveAttribute("href", /^mailto:.+@.+$/);
+    await expect(page.getByRole("link", { name: /start a conversation/i }).first()).toHaveAttribute("href", /^mailto:.+@.+$/);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -35,10 +44,30 @@ test.describe("portfolio platform", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("home hero presents its positioning and primary action in one laptop viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.goto("/");
+    const primaryAction = page.getByRole("link", { name: /explore ai systems/i }).first();
+    await expect(primaryAction).toBeVisible();
+    const actionBox = await primaryAction.boundingBox();
+    expect(actionBox).not.toBeNull();
+    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(800);
+  });
+
+  test("mobile assistant does not cover the hero actions", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.goto("/");
+    const action = await page.getByRole("link", { name: /check job fit/i }).last().boundingBox();
+    const assistant = await page.getByRole("button", { name: "Open portfolio assistant" }).boundingBox();
+    expect(action).not.toBeNull();
+    expect(assistant).not.toBeNull();
+    expect(action!.x + action!.width <= assistant!.x || assistant!.x + assistant!.width <= action!.x).toBe(true);
+  });
+
   test("explorer supports search and taxonomy filtering", async ({ page }) => {
     await page.goto("/explorer");
     await expect(page.getByRole("heading", { name: "Selected work" })).toBeVisible();
-    await page.getByRole("button", { name: /browse the full archive/i }).click();
+    await page.getByRole("button", { name: /browse \d+ more evidence items/i }).click();
     await page.getByLabel(/search portfolio content/i).fill("resume");
     await expect(page.getByRole("heading", { name: /resume/i }).first()).toBeVisible();
     await page.getByRole("tab", { name: "RAG" }).click();
@@ -61,6 +90,7 @@ test.describe("portfolio platform", () => {
 
     await expect(page.getByText(/building the role fit brief/i)).toBeVisible();
     await expect(page.getByRole("navigation", { name: /fit brief sections/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("status")).toContainText(/deterministic fallback/i);
     await expect(page.getByText(/decision/i).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: /the criteria most likely to change the hiring decision/i })).toBeVisible();
     await expect(page.getByText(/proven strengths/i)).toBeVisible();
@@ -138,8 +168,25 @@ test.describe("portfolio platform", () => {
     expect(project).toBeTruthy();
     await page.goto(`/project/${project!.slug}`);
     await expect(page.getByRole("heading", { name: project!.title })).toBeVisible();
+    await expect(page.getByText("Public proof", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Related Items" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("detail routes keep the same public identity as the homepage", async ({ page }) => {
+    await page.goto("/");
+    const homeIdentity = await publicIdentity(page);
+
+    const response = await page.request.get("/api/content");
+    const { items } = await response.json() as { items: Array<{ kind: string; slug: string }> };
+    const detailKinds = ["project", "case-study", "experiment", "blog", "dashboard"];
+
+    for (const kind of detailKinds) {
+      const item = items.find((candidate) => candidate.kind === kind);
+      expect(item, `Expected a published ${kind} fixture`).toBeTruthy();
+      await page.goto(`/${kind}/${item!.slug}`);
+      expect(await publicIdentity(page)).toEqual(homeIdentity);
+    }
   });
 
   test("content cards open from the full card with pointer and keyboard", async ({ page }) => {
@@ -162,11 +209,25 @@ test.describe("portfolio platform", () => {
     await expect(page.getByRole("heading", { name: "Capabilities, grouped by practice." })).toHaveCount(0);
     await expect(page.getByText(/\bnodes\b/i)).toHaveCount(0);
     await expect(page.locator("#selected-systems h2")).toBeVisible();
+    await expect(page.locator("#selected-systems img").first()).toBeVisible();
   });
 
   test("homepage does not expose CMS language to recruiters", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/editable proof signals|edit mode/i)).toHaveCount(0);
+  });
+
+  test("anonymous public pages expose a protected admin login without CMS controls", async ({ page }) => {
+    for (const path of ["/", "/explorer", "/timeline", "/cv", "/job-fit"]) {
+      await page.goto(path);
+      await expect(page.getByRole("link", { name: "Admin login" })).toHaveAttribute("href", "/admin/login");
+      await expect(page.getByText(/verification link pending|admin-editable CMS workflows/i)).toHaveCount(0);
+      await expectNoHorizontalOverflow(page);
+      const descriptions = await page.locator('meta[name="description"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute("content") ?? ""));
+      expect(descriptions.join(" ")).not.toMatch(/\b(admin|cms|editable|edit mode)\b/i);
+    }
+    const manifest = await page.request.get("/manifest.webmanifest");
+    expect((await manifest.json()).description).not.toMatch(/\b(admin|cms|editable|edit mode)\b/i);
   });
 
   test("top-level content routes expose exactly one h1", async ({ page }) => {
@@ -190,6 +251,26 @@ test.describe("portfolio platform", () => {
     await expect(page).toHaveURL(/#main$/);
     await page.getByRole("button", { name: /toggle light and dark theme/i }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
+  });
+
+  test("new visitors start in dark mode and LinkedIn uses its brand blue", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    const headerLinkedIn = page.getByRole("banner").getByRole("link", { name: "LinkedIn profile" });
+    if (await headerLinkedIn.count()) await expect(headerLinkedIn).toHaveCSS("color", "rgb(10, 102, 194)");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("portfolio assistant behaves as a keyboard-accessible dialog", async ({ page }) => {
+    await page.goto("/");
+    const trigger = page.getByRole("button", { name: /open portfolio assistant/i });
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: /ask rahul harivansh fatyal's portfolio/i });
+    await expect(dialog).toBeVisible();
+    await expect(page.locator("#portfolio-question")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
   });
 
   test("admin is protected and seo/media routes respond", async ({ page }) => {

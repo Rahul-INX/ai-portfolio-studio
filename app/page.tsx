@@ -11,10 +11,8 @@ import { EditableAchievements } from "@/components/editable-achievements";
 import { RecruiterBrief } from "@/components/recruiter-brief";
 import { getAchievements, getProjects, getSiteProfile } from "@/lib/content";
 import { isRenderableProfileImage } from "@/lib/media";
-
-function recruiterCopy(value: string, fallback: string) {
-  return /\b(editable|edit mode|cms)\b/i.test(value) ? fallback : value;
-}
+import { projectProof } from "@/lib/project-evidence";
+import { publicProfileCopy } from "@/lib/public-copy";
 
 export default async function HomePage() {
   // Fetch sequentially to avoid exhausting Neon's connection pool.
@@ -22,7 +20,9 @@ export default async function HomePage() {
   const profile = await getSiteProfile();
   const projects = await getProjects();
   const achievements = await getAchievements();
-  const featuredProjects = projects.filter((project) => project.featured);
+  const featuredProjects = projects
+    .filter((project) => project.featured)
+    .sort((left, right) => Number(projectProof(right).tone === "strong") - Number(projectProof(left).tone === "strong"));
   const featured = [...featuredProjects, ...projects.filter((project) => !project.featured)].slice(0, 3);
   const profileImage = isRenderableProfileImage(profile.profileImageUrl) ? profile.profileImageUrl : undefined;
 
@@ -41,19 +41,19 @@ export default async function HomePage() {
   return (
     <SiteShell profile={profile}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <section id="overview" className="relative overflow-hidden border-b hairline">
-        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:px-8 lg:py-14 xl:gap-20">
+      <section id="overview" className="hero-ambient relative overflow-hidden border-b hairline">
+        <div className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-8 px-4 py-9 sm:px-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:px-8 lg:py-9 xl:gap-16">
           <div><EditableHero profile={profile} /></div>
 
-          <div className="lg:pt-8">
-            <div className="relative mx-auto aspect-[4/5] w-full max-w-[15rem] overflow-hidden rounded-xl bg-[var(--panel-strong)] lg:mx-0 lg:ml-auto">
+          <div>
+            <div className="relative mx-auto aspect-[4/5] w-full max-w-[13.5rem] overflow-hidden rounded-xl bg-[var(--panel-strong)] lg:mx-0 lg:ml-auto">
               {profileImage ? (
                 <Image
                   src={profileImage}
                   alt={`${profile.name} portrait`}
                   fill
                   priority
-                  sizes="15rem"
+                  sizes="13.5rem"
                   className="object-cover grayscale-[18%]"
                 />
               ) : (
@@ -91,9 +91,6 @@ export default async function HomePage() {
                   ) : null}
                 </div>
               ) : null}
-              <a href={`mailto:${profile.contactEmail}`} className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
-                <Mail aria-hidden className="h-4 w-4" /> {profile.contactCtaLabel || "Start a conversation"}
-              </a>
             </div>
           </div>
         </div>
@@ -112,7 +109,7 @@ export default async function HomePage() {
           </div>
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
             {featured.map((item) => (
-              <ContentCard key={item.slug} item={item} />
+              <ContentCard key={item.slug} item={item} showImage />
             ))}
           </div>
           <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t hairline pt-6">
@@ -126,8 +123,8 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
           <SectionHeading
             eyebrow={profile.awardsEyebrow}
-            title={recruiterCopy(profile.awardsTitle, "Evidence supporting the AI engineering story.")}
-            description={recruiterCopy(profile.awardsDescription, "Awards, credentials, leadership signals, and milestone proof relevant to the work.")}
+            title={publicProfileCopy(profile.awardsTitle, "Evidence supporting the AI engineering story.")}
+            description={publicProfileCopy(profile.awardsDescription, "Awards, credentials, leadership signals, and milestone proof relevant to the work.")}
             profile={profile}
             editable={{
               eyebrow: "awardsEyebrow",
@@ -137,6 +134,20 @@ export default async function HomePage() {
           />
           <div className="mt-9">
             <EditableAchievements items={achievements} />
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b hairline">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8">
+          <div>
+            <p className="eyebrow">Next step</p>
+            <h2 className="editorial-title mt-3 max-w-3xl text-balance text-3xl sm:text-4xl">Need an AI engineer who can explain the system—not just demo it?</h2>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">Review the evidence, test role fit, or start a direct conversation about the problem you are hiring to solve.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a href={`mailto:${profile.contactEmail}`} className="inline-flex h-11 items-center gap-2 rounded-md bg-[var(--foreground)] px-5 text-sm font-semibold text-[var(--background)] transition hover:bg-[var(--accent)] hover:text-white"><Mail aria-hidden className="h-4 w-4" /> Start a conversation</a>
+            {profile.linkedinUrl ? <a href={profile.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 rounded-md border hairline px-5 text-sm font-semibold transition hover:border-[var(--accent)]">View LinkedIn <ArrowRight aria-hidden className="h-4 w-4" /></a> : null}
           </div>
         </div>
       </section>

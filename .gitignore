@@ -56,6 +56,7 @@ docs/*
 docs/work/*
 !docs/work/portfolio-product-audit.md
 !docs/work/google-drive-media-feasibility.md
+!docs/work/reference-portfolio-comparative-audit.md
 # Dependencies
 node_modules/
 
@@ -97,3 +98,6 @@ prisma/migrations/20260609180000_add_achievements/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+/.swc
+.vercel
+.env*

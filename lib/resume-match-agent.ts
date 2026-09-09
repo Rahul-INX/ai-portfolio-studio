@@ -1,12 +1,9 @@
 import {
-  buildRequirementAlignment,
-  buildJobRubric,
   jobFitResultSchema,
-  verifiedEvidenceSignals,
   type JobFitResult
 } from "@/lib/job-fit";
 import type { ContextEvidence } from "@/lib/site-context";
-import { ProviderCallError, runTextWithFallback } from "@/lib/ai-providers";
+import { geminiResponseJsonSchema, ProviderCallError, runTextWithFallback } from "@/lib/ai-providers";
 import { z } from "zod";
 
 export const resumeMatchAgent = {
@@ -41,6 +38,10 @@ export type ResumeMatchAgentRun =
       detail?: string;
     };
 
+export function shouldUseDeterministicFallback(reason: Exclude<ResumeMatchAgentRun, { ok: true }>["reason"], enabled: boolean) {
+  return enabled && (reason === "missing-api-key" || reason === "incomplete-response");
+}
+
 function normalizedStatus(score: number) {
   if (score >= 74) return "Strong";
   if (score >= 52) return "Moderate";
@@ -48,22 +49,20 @@ function normalizedStatus(score: number) {
   return "Missing";
 }
 
-function normalizeAgentResult(value: unknown, jdText: string) {
+function normalizeAgentResult(value: unknown, _jdText: string) {
+  void _jdText;
   if (!value || typeof value !== "object") return value;
   const candidate = value as Record<string, unknown>;
-  const rubric = buildJobRubric(jdText);
   const dimensions = Array.isArray(candidate.dimensions)
     ? candidate.dimensions.map((dimension, index) => {
         if (!dimension || typeof dimension !== "object") return dimension;
         const item = dimension as Record<string, unknown>;
         const score = typeof item.score === "number" ? item.score : Number(item.score);
+        const rawWeight = typeof item.weight === "number" ? item.weight : Number(item.weight);
         return {
           ...item,
-          name: rubric[index]?.name ?? String(item.name ?? `Criterion ${index + 1}`),
-          category: rubric[index]?.category ?? item.category ?? "Other",
-          priority: rubric[index]?.priority ?? item.priority ?? "Context",
-          weight: rubric[index]?.weight ?? item.weight ?? 3,
-          evidenceStandard: rubric[index]?.evidenceStandard ?? item.evidenceStandard ?? "Direct portfolio evidence is required.",
+          name: String(item.name ?? `Criterion ${index + 1}`),
+          weight: Number.isFinite(rawWeight) ? Math.max(1, Math.min(5, Math.round(rawWeight))) : 3,
           score,
           status: normalizedStatus(score)
         };
@@ -73,23 +72,26 @@ function normalizeAgentResult(value: unknown, jdText: string) {
   return {
     ...candidate,
     dimensions,
+    fairnessNotes: [
+      "This assessment uses only public portfolio evidence supplied to the specialist.",
+      "Missing evidence is treated as unknown, not as a negative personal trait.",
+      "Protected and private attributes are excluded from the match."
+    ],
     mode: "specialist-agent"
   };
 }
 
-export function agentInstructions(ownerName: string, jdText: string) {
-  const rubric = buildJobRubric(jdText);
+export function agentInstructions(ownerName: string, _jdText: string) {
+  void _jdText;
   return `You are the Resume Match Specialist for ${ownerName}'s portfolio.
 
 Your job is to evaluate one job description against supplied public portfolio evidence and produce a concise, recruiter-facing Role Fit Brief. You are an evidence auditor, not an advocate: reward direct proof, mark missing proof as unknown, and never inflate a score to sound encouraging.
 
-The response is constrained by a strict JSON Schema. Populate every field exactly once and do not add fields.
-
-JD-derived rubric, in this exact order:
-${rubric.map((item, index) => `${index + 1}. ${item.name} | ${item.category} | ${item.priority} | weight ${item.weight} | ${item.evidenceStandard}`).join("\n")}
+The response is constrained by a strict JSON Schema. Populate every field exactly once and do not add fields. Extract the evaluation dimensions from the job description yourself before matching evidence.
 
 Writing rules:
-- Use the supplied rubric name exactly for each dimension; never copy a full JD sentence into a name.
+- Create one concise dimension for each decision-relevant must-have, preferred requirement, responsibility cluster, and domain requirement; merge duplicates and never copy a full JD sentence into a name.
+- Return 6 to 8 dimensions, 4 to 6 top-evidence items, 6 to 8 alignment notes, 3 to 5 gaps, exactly 3 interview questions, and 4 to 6 sources. Use fewer evidence items only when the portfolio cannot support four.
 - Keep names as clean noun phrases, verdicts under 45 words, rationales under 30 words, and gaps under 20 words.
 - Start gaps with the missing capability, not boilerplate such as "The candidate should".
 - Write interview questions as direct, specific questions that can be asked verbatim.
@@ -146,7 +148,7 @@ export function createResumeMatchRequestBody(ownerName: string, jdText: string, 
     generationConfig: {
       temperature: 0.1,
       responseMimeType: "application/json",
-      responseSchema: resumeMatchOutputJsonSchema()
+      responseJsonSchema: geminiResponseJsonSchema(resumeMatchOutputJsonSchema())
     }
   };
 }
@@ -156,6 +158,7 @@ export function validateResumeMatchAgentOutput(
   evidence: ContextEvidence[],
   jdText: string
 ): JobFitResult | null {
+  void jdText;
   const parsed = jobFitResultSchema.safeParse(value);
   if (!parsed.success) return null;
 
@@ -169,17 +172,16 @@ export function validateResumeMatchAgentOutput(
 
   const topEvidence = candidate.topEvidence.map((item) => {
     const source = evidenceByUrl.get(item.url)!;
-    const signals = verifiedEvidenceSignals(jdText, source);
     return {
       ...item,
       title: source.section ? `${source.title} - ${source.section}` : source.title,
       type: source.kind,
-      matchReason: `Matches verified JD signals in this section: ${signals.join(", ")}.`,
-      matchedSignals: signals
+      matchedSignals: item.matchedSignals
     };
   });
-  if (topEvidence.some((item) => item.matchedSignals.length === 0)) return null;
 
+  const candidateSources = new Map(candidate.sources.map((item) => [item.url, item]));
+  const topEvidenceByUrl = new Map(topEvidence.map((item) => [item.url, item]));
   const sourceUrls = new Set(candidate.sources.map((item) => item.url));
   for (const item of topEvidence) sourceUrls.add(item.url);
 
@@ -187,20 +189,18 @@ export function validateResumeMatchAgentOutput(
     .slice(0, 8)
     .map((url) => {
       const source = evidenceByUrl.get(url)!;
-      const signals = verifiedEvidenceSignals(jdText, source);
       return {
         title: source.section ? `${source.title} - ${source.section}` : source.title,
         url: source.url,
-        reason: `Supports JD requirements including ${signals.join(", ")}.`
+        reason: candidateSources.get(url)?.reason ?? topEvidenceByUrl.get(url)?.matchReason ?? "Selected by the specialist as role evidence."
       };
     });
-  if (sources.some((source) => source.reason.endsWith("including ."))) return null;
 
   return {
     ...candidate,
     dimensions: candidate.dimensions,
     topEvidence,
-    alignmentNotes: buildRequirementAlignment(jdText, evidence),
+    alignmentNotes: candidate.alignmentNotes,
     sources
   };
 }

@@ -43,6 +43,19 @@ enum MediaProvider {
   GOOGLE_DRIVE
 }
 
+enum JobFitInquiryStatus {
+  QUEUED
+  CORE_COMPLETE
+  RESEARCHING
+  COMPLETE
+  FAILED
+}
+
+enum JobFitCredentialProvider {
+  TAVILY
+  SCRAPE_DO
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -370,9 +383,94 @@ model SiteProfile {
 model JobFitSettings {
   id                           String   @id @default("main")
   deterministicFallbackEnabled Boolean  @default(true)
-  fallbackTimeoutSeconds       Int      @default(45)
+  fallbackTimeoutSeconds       Int      @default(120)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
+}
+
+model JobFitInquiry {
+  id                 String              @id @default(cuid())
+  sessionHash        String
+  contactEmail       String?
+  company            String?
+  role               String?
+  location           String?
+  status             JobFitInquiryStatus @default(QUEUED)
+  jdEncryptedValue   String?
+  jdIv               String?
+  jdAuthTag          String?
+  fileName           String?
+  sourceContentType  String?
+  sourceEncryptedValue String?
+  sourceIv           String?
+  sourceAuthTag      String?
+  coreResult         Json?
+  researchResult     Json?
+  completedAt        DateTime?
+  expiresAt          DateTime
+  pinnedAt           DateTime?
+  publicApprovedAt   DateTime?
+  briefAssetId       String?             @unique
+  sourceAssetId      String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  events             JobFitStageEvent[]
+  chats              JobFitChatMessage[]
+  shareLinks         JobFitShareLink[]
+  briefAsset         MediaAsset?         @relation("JobFitRecruiterBrief", fields: [briefAssetId], references: [id], onDelete: SetNull)
+  sourceAsset        MediaAsset?         @relation("JobFitSourceDocument", fields: [sourceAssetId], references: [id], onDelete: SetNull)
+
+  @@index([sessionHash, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@index([publicApprovedAt, createdAt])
+}
+
+model JobFitShareLink {
+  id        String        @id @default(cuid())
+  inquiryId String
+  tokenHash String        @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime      @default(now())
+  inquiry   JobFitInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, expiresAt])
+}
+
+model JobFitStageEvent {
+  id        String        @id @default(cuid())
+  inquiryId String
+  stage     String
+  status    String
+  detail    String
+  createdAt DateTime      @default(now())
+  inquiry   JobFitInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt])
+}
+
+model JobFitChatMessage {
+  id        String        @id @default(cuid())
+  inquiryId String
+  role      String
+  content   String
+  citations Json?
+  createdAt DateTime      @default(now())
+  inquiry   JobFitInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt])
+}
+
+model JobFitCredential {
+  provider       JobFitCredentialProvider @id
+  encryptedValue String
+  iv             String
+  authTag        String
+  keyHint        String
+  enabled        Boolean                  @default(true)
+  updatedAt      DateTime                 @updatedAt
+  createdAt      DateTime                 @default(now())
 }
 
 model ReadingEvent {
@@ -419,6 +517,8 @@ model MediaAsset {
   folder      String
   createdAt   DateTime      @default(now())
   trashedAt   DateTime?
+  jobFitBrief JobFitInquiry? @relation("JobFitRecruiterBrief")
+  jobFitSource JobFitInquiry? @relation("JobFitSourceDocument")
 
   @@index([folder, createdAt])
 }
@@ -429,7 +529,7 @@ model AiProviderConfig {
   enabled           Boolean        @default(false)
   priority          Int
   selectedModel     String?
-  maxOutputTokens   Int            @default(1200)
+  maxOutputTokens   Int            @default(4096)
   dailyRequestLimit Int            @default(100)
   keys              AiApiKey[]
   createdAt         DateTime       @default(now())

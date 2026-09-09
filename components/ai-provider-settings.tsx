@@ -43,9 +43,9 @@ export function AiProviderSettings() {
   }
 
   async function addKey(event: React.FormEvent<HTMLFormElement>, provider: ProviderName) {
-    event.preventDefault(); const data = new FormData(event.currentTarget);
+    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     const payload = await mutate({ action: "add-key", provider, label: data.get("label"), key: data.get("key") }, `${labels[provider]} key added securely.`);
-    if (payload) { event.currentTarget.reset(); setAdding(null); }
+    if (payload) { form.reset(); setAdding(null); }
   }
 
   function providerData(provider: Provider, data: FormData) {
@@ -82,7 +82,7 @@ export function AiProviderSettings() {
 
   async function testKey(key: ProviderKey) {
     setBusy(true); setMessage(`Testing ${key.label}...`);
-    try { const payload = await readApiResponse<ProviderState>(await fetch("/api/admin/ai-providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test-key", id: key.id }) })); if (payload.providers.length) setProviders(payload.providers); setMessage(`${key.label} works.`); }
+    try { const payload = await readApiResponse<ProviderState>(await fetch("/api/admin/ai-providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test-key", id: key.id }) })); if (payload.providers.length) setProviders(payload.providers); setMessage(`${key.label} generated a response successfully.`); }
     catch (error) { setMessage(error instanceof Error ? error.message : "This key could not be tested."); }
     finally { setBusy(false); }
   }

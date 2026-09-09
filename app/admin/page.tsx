@@ -6,10 +6,12 @@ import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { AiProviderSettings } from "@/components/ai-provider-settings";
 import { ContentHealthPanel } from "@/components/content-health-panel";
 import { JobFitSettingsForm } from "@/components/job-fit-settings-form";
+import { JobFitResearchSettings } from "@/components/job-fit-research-settings";
+import { JobFitInquiryReview } from "@/components/job-fit-inquiry-review";
 import { GoogleDriveMediaSettings } from "@/components/google-drive-media-settings";
 import { SiteShell } from "@/components/site-shell";
 import { getAdminSession } from "@/lib/auth";
-import { getExplorerItems, getSiteProfile } from "@/lib/content";
+import { getCertifications, getExplorerItems, getSiteProfile, getTimeline } from "@/lib/content";
 import { scanContentHealth } from "@/lib/content-health";
 import { getJobFitSettings } from "@/lib/job-fit-settings";
 
@@ -37,12 +39,14 @@ const primaryTasks = [
 
 export default async function AdminPage() {
   if (!(await getAdminSession())) redirect("/admin/login");
-  const [items, profile, jobFitSettings] = await Promise.all([
+  const [items, profile, jobFitSettings, certifications, timeline] = await Promise.all([
     getExplorerItems(),
     getSiteProfile(),
-    getJobFitSettings()
+    getJobFitSettings(),
+    getCertifications(),
+    getTimeline()
   ]);
-  const healthIssues = scanContentHealth(items);
+  const healthIssues = scanContentHealth(items, { profile, certifications, timeline });
 
   return (
     <SiteShell profile={profile}>
@@ -96,9 +100,20 @@ export default async function AdminPage() {
             ))}
           </div>
         </details>
-        <JobFitSettingsForm initialSettings={jobFitSettings} />
-        <GoogleDriveMediaSettings />
-        <AiProviderSettings />
+        <details className="surface mt-5 rounded-lg">
+          <summary className="cursor-pointer list-none p-5 [&::-webkit-details-marker]:hidden">
+            <span className="eyebrow">System settings</span>
+            <span className="mt-2 block text-lg font-semibold">AI, media storage, and reliability</span>
+            <span className="mt-1 block text-sm text-[var(--muted)]">Open only when changing providers, Drive, or Job Fit behavior.</span>
+          </summary>
+          <div className="border-t hairline px-5 pb-6">
+            <JobFitSettingsForm initialSettings={jobFitSettings} />
+            <JobFitInquiryReview />
+            <JobFitResearchSettings />
+            <GoogleDriveMediaSettings />
+            <AiProviderSettings />
+          </div>
+        </details>
       </section>
     </SiteShell>
   );

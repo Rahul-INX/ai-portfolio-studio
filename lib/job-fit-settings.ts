@@ -10,7 +10,7 @@ export type JobFitSettings = {
 export const defaultJobFitSettings: JobFitSettings = {
   id: "main",
   deterministicFallbackEnabled: true,
-  fallbackTimeoutSeconds: 45
+  fallbackTimeoutSeconds: 120
 };
 
 export function normalizeJobFitTimeout(value: number) {

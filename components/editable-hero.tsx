@@ -6,6 +6,7 @@ import { ArrowRight, BarChart3, Database, SearchCheck, ShieldCheck, X } from "lu
 import { useState } from "react";
 import { EditableSection } from "@/components/editable-section";
 import { readApiResponse } from "@/lib/api-response";
+import { publicProfileCopy } from "@/lib/public-copy";
 import type { SiteProfile } from "@/lib/types";
 
 const signals = [
@@ -13,10 +14,6 @@ const signals = [
   { icon: ShieldCheck, label: "styleLabel", value: "styleValue" },
   { icon: BarChart3, label: "modelLabel", value: "modelValue" }
 ] as const;
-
-function publicSignal(value: string, fallback: string) {
-  return /\b(editable|edit mode|cms)\b/i.test(value) ? fallback : value;
-}
 
 export function EditableHero({ profile }: { profile: SiteProfile }) {
   const router = useRouter();
@@ -111,27 +108,27 @@ export function EditableHero({ profile }: { profile: SiteProfile }) {
     >
       <div className="p-1">
         <p className="eyebrow">{draft.heroEyebrow}</p>
-        <h1 className="display-title editorial-title text-balance mt-6 max-w-5xl text-[var(--foreground)]">{draft.heroTitle}</h1>
-        <p className="mt-7 max-w-3xl text-lg leading-8 text-[var(--text-secondary)] sm:text-xl">{draft.heroSummary}</p>
-        <div className="mt-8 grid gap-px overflow-hidden rounded-xl border hairline bg-[var(--line)] sm:grid-cols-3">
+        <h1 className="display-title editorial-title text-balance mt-4 max-w-5xl text-[var(--foreground)]">{draft.heroTitle}</h1>
+        <p className="mt-5 max-w-3xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg">{draft.heroSummary}</p>
+        <div className="mt-6 grid gap-px overflow-hidden rounded-xl border hairline bg-[var(--line)] sm:grid-cols-3">
           {signals.map((signal) => (
-            <div key={signal.label} className="bg-[var(--panel-strong)] p-4">
+            <div key={signal.label} className="bg-[var(--panel-strong)] p-3.5">
               <div className="flex items-center gap-2">
                 <signal.icon aria-hidden className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{publicSignal(draft[signal.label], "Evidence signal")}</p>
+                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{publicProfileCopy(draft[signal.label], "Evidence signal")}</p>
               </div>
-              <p className="mt-2 text-sm font-semibold leading-5">{publicSignal(draft[signal.value], "Explore the work, methods, and results.")}</p>
+              <p className="mt-2 text-sm font-semibold leading-5">{publicProfileCopy(draft[signal.value], "Explore the work, methods, and results.")}</p>
             </div>
           ))}
         </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/explorer" className="inline-flex h-12 items-center gap-2 rounded-md bg-[var(--foreground)] px-5 text-sm font-semibold text-[var(--background)] transition hover:bg-[var(--accent)] hover:text-white">
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/explorer" className="inline-flex h-11 items-center gap-2 rounded-md bg-[var(--foreground)] px-5 text-sm font-semibold text-[var(--background)] transition hover:bg-[var(--accent)] hover:text-white">
             {draft.primaryCtaLabel} <ArrowRight aria-hidden className="h-4 w-4" />
           </Link>
-          <Link href="/timeline" className="inline-flex h-12 items-center rounded-md border hairline px-5 text-sm font-semibold transition hover:border-[var(--accent)]">
+          <Link href="/timeline" className="inline-flex h-11 items-center rounded-md border hairline px-5 text-sm font-semibold transition hover:border-[var(--accent)]">
             {draft.secondaryCtaLabel}
           </Link>
-          <Link href="/job-fit" className="inline-flex h-12 items-center gap-2 rounded-md border hairline px-5 text-sm font-semibold transition hover:border-[var(--accent)]">
+          <Link href="/job-fit" className="inline-flex h-11 items-center gap-2 rounded-md border hairline px-5 text-sm font-semibold transition hover:border-[var(--accent)]">
             Check Job Fit <SearchCheck aria-hidden className="h-4 w-4" />
           </Link>
         </div>

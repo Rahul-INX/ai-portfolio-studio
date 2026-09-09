@@ -28,6 +28,8 @@ npm.cmd run prisma:push
 npm.cmd run prisma:seed
 ```
 
+For local schema testing, set `LOCAL_DATABASE_URL` to a loopback PostgreSQL URL and use `npm run prisma:push:local`. It refuses remote hosts; use the regular `prisma:push` command only when you deliberately intend to change the configured deployment database.
+
 Portfolio records stay in PostgreSQL. Images and documents can live in a private,
 app-managed Google Drive library and are served through stable `/api/media/[id]`
 URLs. Existing PostgreSQL `/api/files/[id]` media remains supported during

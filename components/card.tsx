@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import type { ExplorerItem } from "@/lib/types";
 import { ContextualEditLink } from "@/components/contextual-edit-link";
 import { useEditMode } from "@/components/edit-mode-provider";
 import { InlineContentField } from "@/components/inline-content-field";
 import { markdownToPlainText } from "@/lib/markdown";
+import { resolvePortfolioMedia } from "@/lib/media";
+import { projectProof } from "@/lib/project-evidence";
 
 const kindLabel: Record<ExplorerItem["kind"], string> = {
   project: "Project",
@@ -29,7 +32,7 @@ const kindStyle: Record<ExplorerItem["kind"], { bg: string; text: string; border
   dashboard:    { bg: "bg-rose-50   dark:bg-rose-950/40",   text: "text-rose-700   dark:text-rose-300",  border: "border-rose-200 dark:border-rose-800",  dot: "bg-rose-500" },
 };
 
-export function ContentCard({ item }: { item: ExplorerItem }) {
+export function ContentCard({ item, showImage = false }: { item: ExplorerItem; showImage?: boolean }) {
   const { editMode } = useEditMode();
   const href = `/${item.kind}/${item.slug}`;
   const style = kindStyle[item.kind];
@@ -42,6 +45,7 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
     item.kind === "experiment" ? item.findings :
     undefined;
   const stack = item.kind === "project" ? item.techStack : item.tags;
+  const proof = item.kind === "project" ? projectProof(item) : null;
 
   return (
     <article
@@ -61,16 +65,27 @@ export function ContentCard({ item }: { item: ExplorerItem }) {
         <ArrowUpRight aria-hidden className="h-4 w-4 transition group-hover:text-[var(--accent)]" />
         </div>
       </div>
+      {showImage && item.imageUrl ? (
+        <div className="relative mt-5 aspect-video overflow-hidden rounded-md border hairline bg-[var(--surface-support)]">
+          <Image src={resolvePortfolioMedia(item.imageUrl)} alt={`${item.title} preview`} fill sizes="(min-width: 1024px) 24rem, 90vw" className="object-cover" />
+        </div>
+      ) : null}
       <h3 className="mt-6 text-2xl font-semibold tracking-[-0.025em]">
         <InlineContentField item={item} field="title" label={`${item.title} title`} value={item.title} />
       </h3>
       <div className="mt-3 line-clamp-3 text-sm leading-6 text-[color-mix(in_srgb,var(--foreground),transparent_28%)]">
         <InlineContentField item={item} field={item.kind === "blog" ? "excerpt" : "summary"} label={`${item.title} summary`} value={summary} displayValue={readableSummary} multiline />
       </div>
+      {proof ? (
+        <p className={`mt-4 text-xs font-semibold ${proof.tone === "strong" ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}>
+          Public proof · {proof.label}
+        </p>
+      ) : null}
       {projectMetric ? (
         <div className="mt-5 border-l-2 border-[var(--signal)] pl-3">
           <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">{projectMetric.label}</p>
           <p className="mt-1 text-base font-semibold">{projectMetric.value}</p>
+          <p className="mt-1 text-[0.65rem] text-[var(--muted)]">Portfolio reported · validate in detail</p>
         </div>
       ) : evidence ? (
         <p className="mt-5 line-clamp-2 border-l-2 border-[var(--accent)] pl-3 text-xs leading-5 text-[var(--muted)]">

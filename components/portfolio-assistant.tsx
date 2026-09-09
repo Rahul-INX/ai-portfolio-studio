@@ -138,6 +138,9 @@ export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
   });
   const [loading, setLoading] = useState(false);
   
+  const dialogRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef(messages);
   const messageIdRef = useRef(getHighestMessageId(messages));
@@ -161,6 +164,37 @@ export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : triggerRef.current;
+    inputRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled])'));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [open]);
 
   async function ask(nextMessage = message) {
     const trimmedMessage = nextMessage.trim();
@@ -248,14 +282,14 @@ export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
       className="fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-3 sm:inset-x-auto sm:bottom-5 sm:right-5"
     >
       {open ? (
-        <section className="surface flex max-h-[calc(100dvh-7rem)] w-full flex-col overflow-hidden rounded-lg p-4 shadow-2xl sm:w-[min(34rem,calc(100vw-2.5rem))]">
+        <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="portfolio-assistant-title" className="surface flex max-h-[calc(100dvh-7rem)] w-full flex-col overflow-hidden rounded-lg p-4 shadow-2xl sm:w-[min(34rem,calc(100vw-2.5rem))]">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-sage-700 dark:text-sage-300">
                 Portfolio Copilot
               </p>
-              <h2 className="mt-1 text-base font-semibold tracking-normal">Ask {ownerName}&apos;s portfolio</h2>
+              <h2 id="portfolio-assistant-title" className="mt-1 text-base font-semibold tracking-normal">Ask {ownerName}&apos;s portfolio</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -364,6 +398,7 @@ export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
             className="mt-3 flex gap-2"
           >
             <input
+              ref={inputRef}
               id="portfolio-question"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
@@ -382,12 +417,14 @@ export function PortfolioAssistant({ ownerName }: { ownerName: string }) {
         </section>
       ) : null}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label="Open portfolio assistant"
-        className="grid h-14 w-14 place-items-center rounded-full border border-white/30 bg-ink-900 text-white shadow-2xl transition hover:scale-105 hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
+        className="inline-flex h-12 items-center gap-2 rounded-full border border-white/30 bg-ink-900 px-4 text-sm font-semibold text-white shadow-2xl transition hover:-translate-y-0.5 hover:bg-cobalt-600 dark:bg-ink-50 dark:text-ink-950"
       >
-        <Bot aria-hidden className="h-6 w-6" />
+        <Bot aria-hidden className="h-5 w-5" />
+        <span className="hidden sm:inline">Ask my portfolio</span>
       </button>
     </div>
   );

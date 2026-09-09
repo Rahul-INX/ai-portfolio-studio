@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { decryptApiKey, encryptApiKey, keyHint } from "@/lib/ai-key-crypto";
-import { discoverModels, type AiProvider } from "@/lib/ai-providers";
+import { discoverModels, runProviderCandidates, type AiProvider } from "@/lib/ai-providers";
 import { authOptions, isAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -158,16 +158,31 @@ export async function POST(request: Request) {
     if (!providerName || !apiKey) return NextResponse.json({ error: "Add an enabled provider key first." }, { status: 400 });
 
     try {
-      const models = await discoverModels(providerName, apiKey);
       if (parsed.data.action === "test-key" && storedKey) {
+        if (!storedKey.provider.selectedModel) {
+          return NextResponse.json({ error: "Choose and save a model before testing generation." }, { status: 400 });
+        }
+        await runProviderCandidates([{
+          provider: providerName,
+          model: storedKey.provider.selectedModel,
+          apiKey,
+          maxOutputTokens: 16,
+        }], {
+          system: "Return exactly OK.",
+          messages: [{ role: "user", content: "Connection health check" }],
+          temperature: 0,
+          timeoutMs: 15_000,
+        });
         await prisma.aiApiKey.update({ where: { id: storedKey.id }, data: { lastTestedAt: new Date(), lastTestStatus: "PASS" } });
+        return NextResponse.json({ providers: await sanitizedState() });
       }
+      const models = await discoverModels(providerName, apiKey);
       return NextResponse.json({ models, providers: await sanitizedState() });
     } catch {
       if (parsed.data.action === "test-key" && storedKey) {
         await prisma.aiApiKey.update({ where: { id: storedKey.id }, data: { lastTestedAt: new Date(), lastTestStatus: "FAIL" } });
       }
-      return NextResponse.json({ error: "The provider rejected this key or could not list models.", requestId }, { status: 502 });
+      return NextResponse.json({ error: parsed.data.action === "test-key" ? "The selected model could not generate a response with this key." : "The provider rejected this key or could not list models.", requestId }, { status: 502 });
     }
   } catch {
     console.error(`[ai-providers:${requestId}] Admin action failed`);

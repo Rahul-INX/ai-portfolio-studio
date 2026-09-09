@@ -13,6 +13,7 @@ import {
   createResumeMatchRequestBody,
   resumeMatchOutputJsonSchema,
   runResumeMatchAgent,
+  shouldUseDeterministicFallback,
   validateResumeMatchAgentOutput
 } from "@/lib/resume-match-agent";
 import { gatherAllPortfolioEvidence, type ContextEvidence } from "@/lib/site-context";
@@ -76,12 +77,12 @@ test("builds a strict native structured-output request from the Zod contract", (
     "Allowed evidence"
   );
   const responseFormat = request.generationConfig;
-  const serializedSchema = JSON.stringify(responseFormat.responseSchema);
+  const serializedSchema = JSON.stringify(responseFormat.responseJsonSchema);
 
   assert.equal(responseFormat.responseMimeType, "application/json");
   assert.match(serializedSchema, /overallScore/);
   assert.match(serializedSchema, /dimensions/);
-  assert.doesNotMatch(serializedSchema, /"\$schema"|"default"|"minLength"|"maxLength"/);
+  assert.doesNotMatch(serializedSchema, /"\$schema"|"default"|"minLength"|"maxLength"|"pattern"|"minItems"|"maxItems"|"minimum"|"maximum"/);
 });
 
 test("structured-output prompt requires concise noun-phrase labels", () => {
@@ -92,7 +93,26 @@ test("structured-output prompt requires concise noun-phrase labels", () => {
 
   assert.match(instructions, /never copy a full JD sentence into a name/i);
   assert.match(instructions, /clean noun phrases/i);
-  assert.match(instructions, /Software delivery and business impact/);
+  assert.match(instructions, /merge duplicates/i);
+  assert.match(instructions, /6 to 8 dimensions/i);
+});
+
+test("specialist extracts the rubric from the JD instead of receiving an algorithmic rubric", () => {
+  const instructions = agentInstructions(
+    "Rahul",
+    "Own a confidential systems migration and establish its delivery controls."
+  );
+
+  assert.match(instructions, /extract the evaluation dimensions from the job description/i);
+  assert.doesNotMatch(instructions, /JD-derived rubric, in this exact order/i);
+});
+
+test("deterministic scoring covers unavailable and incomplete provider responses", () => {
+  assert.equal(shouldUseDeterministicFallback("missing-api-key", true), true);
+  assert.equal(shouldUseDeterministicFallback("incomplete-response", true), true);
+  assert.equal(shouldUseDeterministicFallback("timeout", true), false);
+  assert.equal(shouldUseDeterministicFallback("invalid-schema", true), false);
+  assert.equal(shouldUseDeterministicFallback("missing-api-key", false), false);
 });
 
 test("generated provider schema still validates the complete result contract", () => {
@@ -116,7 +136,7 @@ test("accepts a schema-valid agent result grounded in allowed evidence URLs", ()
   assert.equal(result?.topEvidence[0].title, "Resume Matcher - Architecture");
   assert.equal(result?.sources[0].title, "Resume Matcher - Architecture");
   assert.deepEqual(result?.topEvidence[0].matchedSignals, ["evidence", "fastapi", "python", "retrieval", "scoring"]);
-  assert.match(result?.topEvidence[0].matchReason ?? "", /verified JD signals/i);
+  assert.equal(result?.topEvidence[0].matchReason, fallback.topEvidence[0].matchReason);
 });
 
 test("handles a Gemini safety refusal without parsing it as JSON", async () => {
@@ -160,14 +180,14 @@ test("rejects an agent result containing an invented citation URL", () => {
   assert.equal(result, null);
 });
 
-test("rejects an allowed citation that has no verified overlap with the JD", () => {
+test("lets the specialist judge semantic relevance while enforcing the citation allowlist", () => {
   const result = validateResumeMatchAgentOutput(
     validAgentResult(),
     evidence,
     "Kubernetes Terraform infrastructure platform"
   );
 
-  assert.equal(result, null);
+  assert.equal(result?.topEvidence[0].url, evidence[0].url);
 });
 
 test("does not match short technology names inside unrelated words", () => {

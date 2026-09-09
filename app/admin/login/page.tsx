@@ -7,6 +7,12 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
+  const googleEnabled = Boolean(
+    (process.env.GOOGLE_AUTH_CLIENT_ID ?? process.env.GOOGLE_DRIVE_CLIENT_ID) &&
+      (process.env.GOOGLE_AUTH_CLIENT_SECRET ?? process.env.GOOGLE_DRIVE_CLIENT_SECRET)
+  );
+  const credentialsEnabled = process.env.NODE_ENV !== "production" || process.env.ENABLE_CREDENTIALS_LOGIN === "true" || !googleEnabled;
+
   return (
     <main className="grid min-h-screen place-items-center px-4">
       <section className="surface w-full max-w-md rounded-lg p-6">
@@ -17,7 +23,7 @@ export default function LoginPage() {
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
           Authenticated publishing for projects, reports, experiments, writing, dashboards, and timeline records.
         </p>
-        <LoginForm />
+        <LoginForm googleEnabled={googleEnabled} credentialsEnabled={credentialsEnabled} />
       </section>
     </main>
   );

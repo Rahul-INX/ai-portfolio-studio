@@ -113,6 +113,30 @@ test("an admin can create and manually apply a publish-safety draft without savi
   await expect(page.getByText("Safety-reviewed draft applied.")).toBeVisible();
 });
 
+test("an admin can inspect a retained Job Fit JD and its saved assessment", async ({ context, page }) => {
+  await authenticate(context, "ADMIN");
+  await page.route("**/api/admin/job-fit-inquiries**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith("/inquiry-1")) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ inquiry: {
+        id: "inquiry-1", jdText: "Senior Staff Engineer at Acme Labs. Build reliable TypeScript services.", fileName: "acme-jd.txt",
+        coreResult: { summary: "Portfolio evidence supports the role.", scoring: { fitScore: 72, evidenceConfidence: 80, percentile: null }, research: { status: "complete", note: "Cited research completed.", citations: [{ title: "Acme careers", url: "https://example.com/careers" }] }, requirementEvidence: [{ requirement: "TypeScript", evidence: [{}] }] },
+        events: [{ id: "event-1", stage: "research", status: "complete", detail: "Cited research completed." }], chats: [{ id: "chat-1", role: "user", content: "Which project should lead?" }],
+      } }) });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ total: 1, completed: 1, inquiries: [{ id: "inquiry-1", company: "Acme Labs", role: "Senior Staff Engineer", location: "Remote", status: "COMPLETE", createdAt: "2026-09-08T00:00:00.000Z", publicApprovedAt: null }] }) });
+  });
+
+  await page.goto("/admin");
+  await page.getByText("AI, media storage, and reliability", { exact: true }).click();
+  await page.getByRole("button", { name: "View assessment" }).click();
+  await expect(page.getByRole("heading", { name: "Review JD and output" })).toBeVisible();
+  await expect(page.getByText("Senior Staff Engineer at Acme Labs. Build reliable TypeScript services.")).toBeVisible();
+  await expect(page.getByText("Portfolio evidence supports the role.")).toBeVisible();
+  await expect(page.getByText("Acme careers")).toBeVisible();
+});
+
 test("an admin can upload, preview, and remove an unused image", async ({ context, page }) => {
   await authenticate(context, "ADMIN");
   const uploaded = await page.request.post("/api/media", {
@@ -196,6 +220,7 @@ test("owner can manage provider keys and discover Gemini models in the admin UI"
   });
 
   await page.goto("/admin");
+  await page.getByText("AI, media storage, and reliability", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Choose how your AI features should run" })).toBeVisible();
   const gemini = page.locator("article").filter({ hasText: "Gemini" }).first();
   await gemini.getByText("Model and usage controls").click();
@@ -213,7 +238,7 @@ test("owner can manage provider keys and discover Gemini models in the admin UI"
   await keyRow.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Key settings saved.")).toBeVisible();
   await keyRow.getByRole("button", { name: "Test key" }).click();
-  await expect(page.getByText(`${label} works.`)).toBeVisible();
+  await expect(page.getByText(`${label} generated a response successfully.`)).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await keyRow.getByRole("button", { name: "Remove" }).click();
@@ -233,6 +258,7 @@ test("an admin session can open the CMS", async ({ context, page }) => {
 test("Drive storage presents an actionable setup or connected state", async ({ context, page }, testInfo) => {
   await authenticate(context, "ADMIN");
   await page.goto("/admin");
+  await page.getByText("AI, media storage, and reliability", { exact: true }).click();
   const panel = page.getByRole("region", { name: "Your portfolio media library" });
   await expect(panel.getByText(/Open Google setup|Connect Google Drive|Verify connection/, { exact: true })).toBeVisible();
   await expect(panel).not.toContainText("Internal Server Error");

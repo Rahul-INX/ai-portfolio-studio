@@ -22,6 +22,27 @@ test("normalizes official model discovery responses", async () => {
   }
 });
 
+test("uses a Gemini-compatible JSON Schema without excessive constraints", async () => {
+  let requestBody = "";
+  await runProviderCandidates(
+    [{ provider: "GEMINI", model: "gemini", apiKey: "key", maxOutputTokens: 100 }],
+    {
+      system: "System",
+      messages: [{ role: "user", content: "Question" }],
+      jsonSchema: { type: "object", properties: { value: { type: "object", additionalProperties: false } }, additionalProperties: false },
+    },
+    async (_url, init) => {
+      requestBody = String(init?.body ?? "");
+      return json({ candidates: [{ content: { parts: [{ text: "{}" }] } }] });
+    },
+  );
+
+  const generationConfig = JSON.parse(requestBody).generationConfig;
+  assert.equal(generationConfig.responseSchema, undefined);
+  assert.equal(generationConfig.responseJsonSchema.additionalProperties, false);
+  assert.doesNotMatch(JSON.stringify(generationConfig.responseJsonSchema), /"pattern"|"minItems"|"maxItems"|"minimum"|"maximum"/);
+});
+
 test("moves to the next ordered candidate after a retryable provider failure", async () => {
   const candidates: ProviderCandidate[] = [
     { provider: "GEMINI", model: "first", apiKey: "first-key", maxOutputTokens: 100 },
@@ -43,6 +64,28 @@ test("moves to the next ordered candidate after a retryable provider failure", a
   assert.deepEqual(result, { text: "Grounded answer", provider: "GEMINI", model: "second" });
 });
 
+test("shares one timeout budget across all provider candidates", async () => {
+  const candidates: ProviderCandidate[] = [
+    { provider: "GEMINI", model: "first", apiKey: "first-key", maxOutputTokens: 100 },
+    { provider: "OPENAI", model: "second", apiKey: "second-key", maxOutputTokens: 100 },
+  ];
+  let calls = 0;
+  const startedAt = Date.now();
+
+  await assert.rejects(
+    runProviderCandidates(candidates, { system: "System", messages: [{ role: "user", content: "Question" }], timeoutMs: 40 }, async (_url, init) => {
+      calls += 1;
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    }),
+    (error: unknown) => error instanceof Error && "reason" in error && error.reason === "timeout",
+  );
+
+  assert.equal(calls, 1);
+  assert.ok(Date.now() - startedAt < 500);
+});
+
 test("does not retry a malformed provider request", async () => {
   const candidates: ProviderCandidate[] = [
     { provider: "OPENAI", model: "bad", apiKey: "first-key", maxOutputTokens: 100 },
@@ -57,6 +100,17 @@ test("does not retry a malformed provider request", async () => {
     /rejected the request/i,
   );
   assert.equal(calls, 1);
+});
+
+test("classifies rejected credentials so Job Fit may use its no-key fallback", async () => {
+  await assert.rejects(
+    runProviderCandidates(
+      [{ provider: "GEMINI", model: "gemini", apiKey: "bad-key", maxOutputTokens: 100 }],
+      { system: "System", messages: [{ role: "user", content: "Hi" }] },
+      async () => json({ error: { message: "unauthorized" } }, 401),
+    ),
+    (error: unknown) => error instanceof Error && "reason" in error && error.reason === "missing-api-key",
+  );
 });
 
 test("parses OpenAI, Anthropic, and xAI text response shapes", async () => {

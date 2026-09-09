@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { getSiteProfile } from "@/lib/content";
+import { publicProfileCopy, publicProfileSummary } from "@/lib/public-copy";
 import { safeSiteProfile } from "@/lib/safe-content";
 import "./globals.css";
 
@@ -21,17 +22,18 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const profile = await getSiteProfile();
+  const description = publicProfileCopy(profile.seoDescription, publicProfileSummary);
   return {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3000"),
   title: { default: profile.seoTitle, template: `%s | ${profile.name}` },
-  description: profile.seoDescription,
+  description,
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icon.svg"
   },
   openGraph: {
     title: profile.seoTitle,
-    description: profile.seoDescription,
+    description,
     url: "/",
     siteName: profile.name,
     type: "website",
@@ -47,7 +49,7 @@ export async function generateMetadata(): Promise<Metadata> {
   twitter: {
     card: "summary_large_image",
     title: profile.seoTitle,
-    description: profile.seoDescription,
+    description,
     images: ["/media/ai-systems-hero.png"]
   }
   };
@@ -66,7 +68,7 @@ export const viewport: Viewport = {
 const themeScript = `
   try {
     const stored = localStorage.getItem("theme");
-    if (stored === "dark") document.documentElement.classList.add("dark");
+    if (stored !== "light") document.documentElement.classList.add("dark");
   } catch {}
 `;
 
@@ -74,7 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="description" content={safeSiteProfile.seoDescription} />
+        <meta name="description" content={publicProfileCopy(safeSiteProfile.seoDescription, publicProfileSummary)} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         <Script id="theme-script" strategy="beforeInteractive">

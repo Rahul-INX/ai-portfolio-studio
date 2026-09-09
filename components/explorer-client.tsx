@@ -117,7 +117,7 @@ export function ExplorerClient({ items }: { items: ExplorerItem[] }) {
           >
             <span>
               <span className="eyebrow">Supporting evidence</span>
-              <span id="archive-title" className="mt-2 block text-lg font-semibold">Browse the full archive</span>
+              <span id="archive-title" className="mt-2 block text-lg font-semibold">Browse {Math.max(publishableItems.length - featured.length, 0)} more evidence items</span>
               <span className="mt-1 block text-sm text-[var(--muted)]">Experiments, writing, and additional systems stay available without competing with the hiring story.</span>
             </span>
             <ArrowRight aria-hidden className={`h-5 w-5 shrink-0 transition ${archiveIsOpen ? "rotate-90" : ""}`} />

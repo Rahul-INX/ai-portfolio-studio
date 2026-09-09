@@ -4,6 +4,7 @@ import { InlineProfileBlock } from "@/components/inline-profile-block";
 import { SiteShell } from "@/components/site-shell";
 import { getSiteProfile } from "@/lib/content";
 import { getJobFitSettings } from "@/lib/job-fit-settings";
+import { getPublicJobFitActivity } from "@/lib/job-fit-store";
 
 export const metadata: Metadata = {
   title: "Check Job Fit",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function JobFitPage() {
-  const [profile, settings] = await Promise.all([getSiteProfile(), getJobFitSettings()]);
+  const [profile, settings, activity] = await Promise.all([getSiteProfile(), getJobFitSettings(), getPublicJobFitActivity()]);
 
   return (
     <SiteShell profile={profile}>
@@ -25,6 +26,7 @@ export default async function JobFitPage() {
             <InlineProfileBlock profile={profile} field="jobFitDescription" label="Job fit description" value={profile.jobFitDescription} />
           </p>
         </div>
+        {activity.length ? <div className="mt-6 flex flex-wrap gap-2" aria-label="Approved Job Fit activity">{activity.map((label) => <span key={label} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-[0_0_18px_rgba(16,185,129,0.16)] dark:text-emerald-200">Evaluated: {label}</span>)}</div> : null}
         <div className="mt-8">
           <JobFitClient timeoutSeconds={settings.fallbackTimeoutSeconds} profile={profile} />
         </div>

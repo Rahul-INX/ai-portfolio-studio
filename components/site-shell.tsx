@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { NavigationFeedback } from "@/components/navigation-feedback";
 import { EditModeProvider } from "@/components/edit-mode-provider";
 import { getAdminSession } from "@/lib/auth";
-import { safeSiteProfile } from "@/lib/safe-content";
+import { getSiteProfile } from "@/lib/content";
 import { isRenderableProfileImage } from "@/lib/media";
 import type { SiteProfile } from "@/lib/types";
 
@@ -16,7 +16,8 @@ function telHref(phone?: string | null) {
   return phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
 }
 
-export async function SiteShell({ children, profile = safeSiteProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
+export async function SiteShell({ children, profile: requestedProfile }: { children: React.ReactNode; profile?: SiteProfile }) {
+  const profile = requestedProfile ?? await getSiteProfile();
   const session = await getAdminSession();
   const profileImage = isRenderableProfileImage(profile.profileImageUrl) ? profile.profileImageUrl : undefined;
   const nav = [
@@ -89,7 +90,7 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
                       rel="noreferrer"
                       aria-label={item.label}
                       title={item.label}
-                      className={`grid h-9 w-9 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--foreground)] ${item.colorClass}`}
+                      className={`grid h-9 w-9 place-items-center rounded-md transition hover:bg-[var(--panel)] ${item.colorClass || "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
                     >
                       <Icon className="h-4 w-4" />
                     </a>
@@ -105,8 +106,9 @@ export async function SiteShell({ children, profile = safeSiteProfile }: { child
                   <AdminLogoutButton compact />
                 </>
               ) : (
-                <Link href="/admin/login" aria-label="Admin sign in" title="Admin sign in" className="grid h-9 w-9 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--foreground)]">
+                <Link href="/admin/login" aria-label="Admin login" className="inline-flex h-10 items-center gap-2 rounded-md border hairline bg-[var(--panel)] px-2.5 text-sm font-medium text-[var(--foreground)] transition hover:border-cobalt-500">
                   <LogIn aria-hidden className="h-4 w-4" />
+                  <span className="hidden lg:inline">Admin login</span>
                 </Link>
               )}
             </div>

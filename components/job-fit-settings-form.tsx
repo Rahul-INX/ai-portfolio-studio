@@ -78,7 +78,7 @@ export function JobFitSettingsForm({ initialSettings }: { initialSettings: JobFi
       </div>
 
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        When fallback is disabled, model, timeout, or grounding failures are shown as errors instead of deterministic scores.
+        Rules-based scoring is used only when no model key is available. Configured-provider failures return an error after this wait limit instead of silently substituting a score.
       </p>
       {message ? <p className="mt-2 text-sm text-[var(--muted)]" aria-live="polite">{message}</p> : null}
     </form>

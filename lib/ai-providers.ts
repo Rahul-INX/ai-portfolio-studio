@@ -81,6 +81,18 @@ export async function discoverModels(
   }).sort((a, b) => a.label.localeCompare(b.label));
 }
 
+const geminiComplexityKeywords = new Set(["pattern", "minItems", "maxItems", "minimum", "maximum"]);
+
+export function geminiResponseJsonSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(geminiResponseJsonSchema);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !geminiComplexityKeywords.has(key))
+      .map(([key, item]) => [key, geminiResponseJsonSchema(item)])
+  );
+}
+
 function requestFor(candidate: ProviderCandidate, prompt: ProviderPrompt): [string, RequestInit] {
   const maxOutputTokens = Math.max(1, Math.min(candidate.maxOutputTokens, 8192));
   if (candidate.provider === "GEMINI") {
@@ -98,7 +110,7 @@ function requestFor(candidate: ProviderCandidate, prompt: ProviderPrompt): [stri
           generationConfig: {
             temperature: prompt.temperature ?? 0.2,
             maxOutputTokens,
-            ...(prompt.jsonSchema ? { responseMimeType: "application/json", responseSchema: prompt.jsonSchema } : {}),
+            ...(prompt.jsonSchema ? { responseMimeType: "application/json", responseJsonSchema: geminiResponseJsonSchema(prompt.jsonSchema) } : {}),
           },
         }),
       },
@@ -157,10 +169,13 @@ function responseText(provider: AiProvider, payload: Record<string, unknown>) {
 async function callProvider(candidate: ProviderCandidate, prompt: ProviderPrompt, fetcher: Fetcher) {
   const [url, init] = requestFor(candidate, prompt);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Math.max(1_000, Math.min(prompt.timeoutMs ?? 20_000, 120_000)));
+  const timeout = setTimeout(() => controller.abort(), Math.max(1, Math.min(prompt.timeoutMs ?? 20_000, 120_000)));
   try {
     const response = await fetcher(url, { ...init, signal: controller.signal });
     if (!response.ok) {
+      if ([401, 403].includes(response.status)) {
+        throw new ProviderCallError("Provider rejected the configured key.", true, "missing-api-key");
+      }
       const retryable = ![400, 422].includes(response.status);
       throw new ProviderCallError(
         retryable ? `Provider unavailable (${response.status}).` : `Provider rejected the request (${response.status}).`,
@@ -195,6 +210,7 @@ export async function runProviderCandidates(
   quotaConsumer: QuotaConsumer = consumeProviderQuota,
 ): Promise<ProviderResult> {
   if (!candidates.length) throw new ProviderCallError("No AI provider is configured.", true, "missing-api-key");
+  const deadline = Date.now() + Math.max(1, Math.min(prompt.timeoutMs ?? 20_000, 120_000));
   let lastError: unknown;
   for (const candidate of candidates) {
     try {
@@ -202,13 +218,114 @@ export async function runProviderCandidates(
         lastError = new ProviderCallError(`${candidate.provider} daily request limit reached.`, true, "rate-limit");
         continue;
       }
-      return { text: await callProvider(candidate, prompt, fetcher), provider: candidate.provider, model: candidate.model };
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new ProviderCallError("Provider request timed out.", true, "timeout");
+      return { text: await callProvider(candidate, { ...prompt, timeoutMs: remaining }, fetcher), provider: candidate.provider, model: candidate.model };
     } catch (error) {
       lastError = error;
       if (error instanceof ProviderCallError && !error.retryable) throw error;
+      if (Date.now() >= deadline) break;
     }
   }
   throw lastError instanceof Error ? lastError : new ProviderCallError("All AI providers failed.", true);
+}
+
+export type ProviderStreamResult = { stream: ReadableStream<Uint8Array>; provider: AiProvider; model: string };
+
+function streamingRequestFor(candidate: ProviderCandidate, prompt: ProviderPrompt): [string, RequestInit] {
+  const maxOutputTokens = Math.max(1, Math.min(candidate.maxOutputTokens, 8192));
+  if (candidate.provider === "GEMINI") {
+    return [
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidate.model)}:streamGenerateContent?alt=sse`,
+      { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": candidate.apiKey }, body: JSON.stringify({ systemInstruction: { parts: [{ text: prompt.system }] }, contents: prompt.messages.map((message) => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })), generationConfig: { temperature: prompt.temperature ?? 0.2, maxOutputTokens } }) },
+    ];
+  }
+  if (candidate.provider === "ANTHROPIC") {
+    return ["https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": candidate.apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: candidate.model, max_tokens: maxOutputTokens, system: prompt.system, messages: prompt.messages, temperature: prompt.temperature ?? 0.2, stream: true }) }];
+  }
+  return [
+    candidate.provider === "OPENAI" ? "https://api.openai.com/v1/responses" : "https://api.x.ai/v1/responses",
+    { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.apiKey}` }, body: JSON.stringify({ model: candidate.model, instructions: prompt.system, input: prompt.messages, max_output_tokens: maxOutputTokens, temperature: prompt.temperature ?? 0.2, stream: true }) },
+  ];
+}
+
+function textDelta(provider: AiProvider, payload: Record<string, unknown>) {
+  if (provider === "GEMINI") return ((payload.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }> | undefined)?.[0]?.content?.parts ?? []).map((part) => part.text ?? "").join("");
+  if (provider === "ANTHROPIC") return (payload.delta as { text?: string } | undefined)?.text ?? "";
+  return typeof payload.delta === "string" ? payload.delta : "";
+}
+
+function decodeSse(response: Response, provider: AiProvider, timeoutMs: number): ReadableStream<Uint8Array> {
+  if (!response.body) throw new ProviderCallError("Provider returned an empty stream.", true, "empty-response");
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  let buffer = "";
+  const deadline = Date.now() + timeoutMs;
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) { void reader.cancel().catch(() => undefined); controller.close(); return; }
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const timeout = Symbol("stream-timeout");
+          const next = await Promise.race([
+            reader.read(),
+            new Promise<typeof timeout>((resolve) => { timer = setTimeout(() => resolve(timeout), remaining); }),
+          ]).finally(() => { if (timer) clearTimeout(timer); });
+          if (next === timeout) { void reader.cancel().catch(() => undefined); controller.close(); return; }
+          if (next.done) { controller.close(); return; }
+          buffer += decoder.decode(next.value, { stream: true });
+          const frames = buffer.split(/\r?\n\r?\n/); buffer = frames.pop() ?? "";
+          for (const frame of frames) {
+            const data = frame.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
+            if (!data) continue;
+            if (data === "[DONE]") { void reader.cancel().catch(() => undefined); controller.close(); return; }
+            try {
+              const payload = JSON.parse(data) as Record<string, unknown>;
+              const delta = textDelta(provider, payload); if (delta) controller.enqueue(encoder.encode(delta));
+              const geminiDone = provider === "GEMINI" && ((payload.candidates as Array<{ finishReason?: string }> | undefined) ?? []).some((candidate) => Boolean(candidate.finishReason));
+              if (geminiDone) { void reader.cancel().catch(() => undefined); controller.close(); return; }
+            }
+            catch { /* Ignore provider metadata frames that do not carry JSON text. */ }
+          }
+        }
+      } catch (error) { void reader.cancel(error).catch(() => undefined); controller.error(error); }
+    },
+    async cancel() { await reader.cancel(); },
+  });
+}
+
+export async function streamProviderCandidates(
+  candidates: ProviderCandidate[],
+  prompt: ProviderPrompt,
+  fetcher: Fetcher = fetch,
+  quotaConsumer: QuotaConsumer = consumeProviderQuota,
+): Promise<ProviderStreamResult> {
+  if (!candidates.length) throw new ProviderCallError("No AI provider is configured.", true, "missing-api-key");
+  const deadline = Date.now() + Math.max(1, Math.min(prompt.timeoutMs ?? 60_000, 120_000));
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try {
+      if (prompt.enforceQuota && !(await quotaConsumer(candidate.provider, candidate.dailyRequestLimit ?? 100))) continue;
+      const [url, init] = streamingRequestFor(candidate, prompt);
+      const timeoutMs = deadline - Date.now();
+      if (timeoutMs <= 0) throw new ProviderCallError("Provider request timed out.", true, "timeout");
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const response = await Promise.race([
+        fetcher(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ProviderCallError("Provider request timed out.", true, "timeout")), timeoutMs); }),
+      ]).finally(() => { if (timer) clearTimeout(timer); });
+      if (!response.ok) throw new ProviderCallError(`Provider stream unavailable (${response.status}).`, ![400, 422].includes(response.status));
+      return { stream: decodeSse(response, candidate.provider, timeoutMs), provider: candidate.provider, model: candidate.model };
+    } catch (error) {
+      lastError = error;
+      if (error instanceof ProviderCallError && !error.retryable) throw error;
+      if (Date.now() >= deadline) break;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new ProviderCallError("All provider streams failed.", true);
 }
 
 export async function loadProviderCandidates(): Promise<ProviderCandidate[]> {
@@ -243,7 +360,7 @@ export async function loadProviderCandidates(): Promise<ProviderCandidate[]> {
       provider: "GEMINI",
       model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite",
       apiKey: process.env.GEMINI_API_KEY,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 4096,
       dailyRequestLimit: Number(process.env.AI_DAILY_REQUEST_LIMIT ?? 100),
     });
   }

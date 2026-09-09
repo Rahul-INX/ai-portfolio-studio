@@ -6,6 +6,7 @@ import { SiteShell } from "@/components/site-shell";
 import { getCertifications, getPortfolioDocuments, getProjects, getSiteProfile, getSkills, getTimeline } from "@/lib/content";
 import { InlineProfileText } from "@/components/inline-profile-text";
 import { renderMarkdownToHtml } from "@/lib/markdown";
+import { publicProfileCopy, publicProfileSummary } from "@/lib/public-copy";
 
 export const metadata: Metadata = { title: "Detailed CV", description: "Detailed public portfolio CV with projects, skills, experience, and certifications." };
 
@@ -78,7 +79,7 @@ export default async function CvPage() {
               <InlineProfileText profile={profile} field="cvSummaryTitle" label="CV summary title" value={profile.cvSummaryTitle} />
             }
           >
-            <p className="leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_24%)]">{profile.seoDescription}</p>
+            <p className="leading-7 text-[color-mix(in_srgb,var(--foreground),transparent_24%)]">{publicProfileCopy(profile.seoDescription, publicProfileSummary)}</p>
           </SectionShell>
 
           <SectionShell id="skills" title={profile.skillsTitle}>

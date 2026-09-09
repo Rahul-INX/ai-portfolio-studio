@@ -24,6 +24,7 @@ import {
   safeSkills,
   safeTimeline
 } from "@/lib/safe-content";
+import { publicProfileCopy, publicProfileSummary } from "@/lib/public-copy";
 import type { ContentKind } from "@/lib/types";
 
 export type SiteContextItem = CitationTarget & {
@@ -251,6 +252,7 @@ export async function buildSiteContextItems(useSafeContent = false): Promise<Sit
         getPortfolioDocuments()
       ]);
 
+  const profileSummary = publicProfileCopy(profile.seoDescription, publicProfileSummary);
   const baseItems: SiteContextItem[] = [
     contextItem({
       id: "profile:home",
@@ -258,7 +260,7 @@ export async function buildSiteContextItems(useSafeContent = false): Promise<Sit
       title: `${profile.name} profile`,
       section: "Overview",
       summary: profile.heroSummary,
-      body: `${profile.role}. ${profile.seoDescription}. Skills: ${skills.map((skill) => `${skill.name} ${skill.category}`).join(", ")}. Timeline: ${timeline.map((item) => `${item.period} ${item.title} ${item.description}`).join(" ")}`,
+      body: `${profile.role}. ${profileSummary}. Skills: ${skills.map((skill) => `${skill.name} ${skill.category}`).join(", ")}. Timeline: ${timeline.map((item) => `${item.period} ${item.title} ${item.description}`).join(" ")}`,
       tags: ["Profile", "GenAI", "Data Science", "Skills", "Timeline"]
     }),
     contextItem({
@@ -287,7 +289,7 @@ export async function buildSiteContextItems(useSafeContent = false): Promise<Sit
       kind: "cv" as const,
       title: `${profile.name} CV`,
       section: "Summary",
-      summary: profile.seoDescription,
+      summary: profileSummary,
       body: `${profile.heroSummary}\n${projects.map((item) => `${item.title}: ${item.summary} ${item.businessImpact}`).join("\n")}`,
       tags: ["CV", "Resume", "Profile", "Skills", "Projects", "Career"]
     }),
